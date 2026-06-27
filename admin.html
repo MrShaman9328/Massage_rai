@@ -956,14 +956,46 @@ function setupAdminTabs(){
 // но полностью закрывает случайный заход посторонних людей по ссылке.
 // Чтобы сменить пароль — поменяйте строку ниже.
 const ADMIN_PASSWORD = 'rai2026';
+const SESSION_KEY = 'rai_admin_session';
+const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 минут
+
+function startSession(){
+  sessionStorage.setItem(SESSION_KEY, String(Date.now()));
+}
+
+function hasValidSession(){
+  const stamp = sessionStorage.getItem(SESSION_KEY);
+  if (!stamp) return false;
+  const elapsed = Date.now() - Number(stamp);
+  return elapsed < SESSION_DURATION_MS;
+}
+
+function clearSession(){
+  sessionStorage.removeItem(SESSION_KEY);
+}
+
+function showAdmin(){
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('adminContent').classList.remove('hidden');
+  initAdminContent();
+  scheduleAutoLogout();
+}
+
+function scheduleAutoLogout(){
+  const stamp = Number(sessionStorage.getItem(SESSION_KEY));
+  const remaining = SESSION_DURATION_MS - (Date.now() - stamp);
+  setTimeout(() => {
+    clearSession();
+    location.reload();
+  }, Math.max(remaining, 0));
+}
 
 function checkPassword(){
   const input = document.getElementById('passwordInput');
   const error = document.getElementById('passwordError');
   if (input.value === ADMIN_PASSWORD){
-    document.getElementById('loginScreen').classList.add('hidden');
-    document.getElementById('adminContent').classList.remove('hidden');
-    initAdminContent();
+    startSession();
+    showAdmin();
   } else {
     error.textContent = 'Неверный пароль';
     input.value = '';
@@ -994,7 +1026,13 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('passwordInput').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') checkPassword();
   });
-  document.getElementById('passwordInput').focus();
+
+  if (hasValidSession()){
+    showAdmin();
+  } else {
+    clearSession();
+    document.getElementById('passwordInput').focus();
+  }
 });
 
 
