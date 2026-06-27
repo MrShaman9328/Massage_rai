@@ -1,0 +1,1166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>РАЙ — Массажный салон</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #F4E9E6;
+    --bg-soft: #FBF4F2;
+    --card: #FFFFFF;
+    --ink: #3A2C29;
+    --ink-soft: #7A6864;
+    --rose: #C99A9A;
+    --rose-deep: #B07E7E;
+    --bronze: #9C8266;
+    --line: #E6D4CF;
+    --shadow: 0 18px 40px -20px rgba(58,44,41,0.25);
+    --radius: 22px;
+    --good: #6E9C7C;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: var(--bg);
+    color: var(--ink);
+    font-family:'Manrope', sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+    overflow-x:hidden;
+  }
+  body::before{
+    content:"";
+    position:fixed;
+    inset:0;
+    background:
+      radial-gradient(ellipse 600px 400px at 8% -5%, rgba(201,154,154,0.25), transparent 60%),
+      radial-gradient(ellipse 500px 500px at 100% 15%, rgba(156,130,102,0.15), transparent 60%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  .wrap{ max-width:560px; margin:0 auto; padding:28px 20px 80px; position:relative; z-index:1; }
+
+  /* ---------- Header ---------- */
+  header{ text-align:center; padding:18px 0 28px; position:relative; }
+  .crest{ width:46px; height:46px; margin:0 auto 14px; opacity:0.85; }
+  .brand-name{ font-family:'Marcellus', serif; font-size:34px; letter-spacing:0.18em; margin:0; color:var(--ink); }
+  .brand-tagline{
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-size:22px;
+    letter-spacing:0.03em;
+    color:var(--bronze);
+    margin-top:6px;
+  }
+  .brand-sub{ font-family:'Manrope', sans-serif; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--ink-soft); margin-top:6px; }
+  .swoosh{ width:120px; height:14px; margin:18px auto 0; opacity:0.6; }
+
+  /* ---------- Mode switch (tiny, unobtrusive) ---------- */
+  .mode-switch{
+    text-align:center;
+    margin-top:14px;
+  }
+  .mode-switch a{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    text-decoration:underline;
+    text-decoration-color: var(--line);
+    cursor:pointer;
+    opacity:0.7;
+  }
+
+  /* ---------- Step indicator ---------- */
+  .steps{ display:flex; justify-content:center; align-items:center; gap:8px; margin-bottom:28px; }
+  .step-dot{ width:7px;height:7px;border-radius:50%; background:var(--line); transition:all .35s ease; }
+  .step-dot.active{ background:var(--rose-deep); width:22px;border-radius:5px; }
+  .step-dot.done{ background:var(--bronze); }
+
+  /* ---------- Cards ---------- */
+  .panel{
+    background:var(--card);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:26px 22px;
+    margin-bottom:18px;
+    animation: rise .5s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes rise{ from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
+  .panel h2{ font-family:'Marcellus', serif; font-size:21px; letter-spacing:0.02em; margin:0 0 4px; color:var(--ink); }
+  .panel .hint{ font-size:13px; color:var(--ink-soft); margin:0 0 20px; line-height:1.5; }
+
+  /* ---------- Category labels ---------- */
+  .category-label{
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-size:15px;
+    color:var(--bronze);
+    margin:22px 0 10px;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .category-label:first-of-type{ margin-top:0; }
+
+  .category-note{
+    background: linear-gradient(135deg, rgba(201,154,154,0.14), rgba(156,130,102,0.14));
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 14px;
+    font-size:12.5px;
+    color:var(--ink);
+    line-height:1.5;
+    margin-bottom:12px;
+  }
+  .category-note::before{ content:"✦ "; color:var(--bronze); }
+
+  /* ---------- Service cards ---------- */
+  .service{
+    display:flex; justify-content:space-between; align-items:center; gap:14px;
+    padding:14px 16px; border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px;
+    cursor:pointer; transition: border-color .2s, background .2s, transform .15s; background:var(--bg-soft);
+  }
+  .service:hover{ border-color:var(--rose); }
+  .service:active{ transform:scale(0.985); }
+  .service.selected{ border-color:var(--rose-deep); background: rgba(201,154,154,0.12); }
+  .service-name{ font-size:14.5px; font-weight:600; line-height:1.35; }
+  .service-meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
+  .service-price{ font-family:'Marcellus', serif; font-size:16px; white-space:nowrap; color:var(--rose-deep); }
+
+  /* ---------- Buttons ---------- */
+  .btn{ width:100%; padding:16px; border-radius:14px; border:none; font-family:'Manrope'; font-weight:700; font-size:15px; letter-spacing:0.02em; cursor:pointer; transition: filter .2s, transform .15s, opacity .2s; }
+  .btn-primary{ background: linear-gradient(135deg, var(--rose-deep), var(--bronze)); color:#fff; box-shadow: 0 14px 30px -10px rgba(176,126,126,0.55); }
+  .btn-primary:disabled{ opacity:0.4; cursor:not-allowed; box-shadow:none; }
+  .btn-primary:not(:disabled):hover{ filter:brightness(1.06); }
+  .btn-primary:not(:disabled):active{ transform:scale(0.98); }
+  .btn-ghost{ background:transparent; color:var(--ink-soft); font-weight:600; padding:12px; font-size:13px; }
+  .btn-row{ display:flex; gap:10px; margin-top:6px; }
+
+  /* ---------- Calendar ---------- */
+  .cal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+  .cal-month{ font-family:'Marcellus', serif; font-size:17px; }
+  .cal-nav-btn{ width:32px;height:32px; border-radius:50%; border:1.5px solid var(--line); background:var(--bg-soft); color:var(--ink); font-size:15px; cursor:pointer; display:flex;align-items:center;justify-content:center; }
+  .cal-nav-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  .cal-grid{ display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; text-align:center; }
+  .cal-dow{ font-size:11px; color:var(--ink-soft); font-weight:600; padding-bottom:6px; }
+  .cal-day{ aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:50%; font-size:13.5px; font-weight:600; cursor:pointer; color:var(--ink); position:relative; transition: background .2s, color .2s; }
+  .cal-day.empty{ visibility:hidden; cursor:default; }
+  .cal-day.past{ color:#D8C9C5; cursor:not-allowed; }
+  .cal-day.no-slots{ color:#D8C9C5; cursor:not-allowed; }
+  .cal-day.available:hover{ background:var(--line); }
+  .cal-day.available::after{ content:""; position:absolute; bottom:3px; width:4px;height:4px; border-radius:50%; background:var(--rose-deep); }
+  .cal-day.selected{ background:var(--rose-deep); color:#fff; }
+  .cal-day.selected::after{ display:none; }
+  .cal-day.today{ box-shadow: inset 0 0 0 1.5px var(--bronze); }
+
+  /* ---------- Time slots ---------- */
+  .slots-title{ font-size:13px; color:var(--ink-soft); margin:20px 0 10px; }
+  .slots-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+  .slot{ padding:11px 4px; text-align:center; border-radius:10px; border:1.5px solid var(--line); font-size:13.5px; font-weight:600; cursor:pointer; background:var(--bg-soft); transition:.2s; }
+  .slot:hover{ border-color:var(--rose); }
+  .slot.selected{ background:var(--rose-deep); color:#fff; border-color:var(--rose-deep); }
+  .empty-state{ text-align:center; padding:26px 10px; color:var(--ink-soft); font-size:13.5px; line-height:1.6; }
+
+  /* ---------- Form ---------- */
+  .field{ margin-bottom:16px; }
+  .field label{ display:block; font-size:12.5px; font-weight:700; color:var(--ink-soft); margin-bottom:7px; text-transform:uppercase; letter-spacing:0.04em; }
+  .field input{ width:100%; padding:14px 16px; border-radius:12px; border:1.5px solid var(--line); font-family:'Manrope'; font-size:15px; background:var(--bg-soft); color:var(--ink); }
+  .field input:focus{ outline:none; border-color:var(--rose-deep); }
+  .field input::placeholder{ color:#C2B2AD; }
+
+  /* ---------- Summary ---------- */
+  .summary{ background:var(--bg-soft); border-radius:14px; padding:16px 18px; margin-bottom:20px; border:1.5px dashed var(--line); }
+  .summary-row{ display:flex; justify-content:space-between; font-size:13.5px; padding:5px 0; }
+  .summary-row.total{ border-top:1px solid var(--line); margin-top:6px; padding-top:10px; font-weight:700; }
+  .summary-row .label{ color:var(--ink-soft); }
+
+  /* ---------- Confirmation ---------- */
+  .confirm-icon{ width:64px;height:64px; margin:0 auto 18px; border-radius:50%; background:linear-gradient(135deg, var(--rose-deep), var(--bronze)); display:flex;align-items:center;justify-content:center; }
+  .confirm-icon svg{ width:28px; height:28px; stroke:#fff; }
+  .confirm-title{ font-family:'Marcellus', serif; font-size:23px; text-align:center; margin:0 0 8px; }
+  .confirm-sub{ text-align:center; font-size:13.5px; color:var(--ink-soft); margin-bottom:24px; line-height:1.6; }
+  .confirm-details{ background:var(--bg-soft); border-radius:14px; padding:18px; }
+  .confirm-details .row{ display:flex; justify-content:space-between; padding:7px 0; font-size:13.5px; border-bottom:1px solid var(--line); }
+  .confirm-details .row:last-child{ border-bottom:none; }
+
+  .cancel-link-wrap{ text-align:center; margin-bottom:18px; }
+  .cancel-link-wrap a{
+    font-size:12.5px;
+    color:var(--ink-soft);
+    text-decoration:underline;
+    text-decoration-color: var(--line);
+    cursor:pointer;
+    opacity:0.75;
+  }
+  .cancel-code-box{
+    background:var(--bg-soft);
+    border:1.5px dashed var(--line);
+    border-radius:14px;
+    padding:16px;
+    text-align:center;
+    margin-top:16px;
+  }
+  .cancel-code-label{
+    font-size:11.5px;
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+  }
+  .cancel-code-value{
+    font-family:'Marcellus', serif;
+    font-size:26px;
+    letter-spacing:0.15em;
+    color:var(--rose-deep);
+  }
+  .cancel-code-hint{
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:6px;
+    line-height:1.5;
+  }
+
+  footer{ text-align:center; margin-top:30px; font-size:12px; color:var(--ink-soft); line-height:1.7; }
+
+  /* ---------- Reviews ---------- */
+  .reviews-panel{ margin-top:8px; }
+  .reviews-header{ margin-bottom:18px; }
+  .reviews-rating{
+    display:flex; align-items:center; gap:6px; margin-top:4px;
+  }
+  .reviews-stars{ color:#D4A24C; font-size:14px; letter-spacing:1px; }
+  .reviews-score{ font-family:'Marcellus', serif; font-size:15px; color:var(--ink); }
+  .reviews-count{ font-size:12px; color:var(--ink-soft); }
+  .review-card{
+    background:var(--bg-soft);
+    border-radius:14px;
+    padding:16px 18px;
+    margin-bottom:12px;
+  }
+  .review-top{
+    display:flex; justify-content:space-between; align-items:baseline;
+    margin-bottom:8px;
+  }
+  .review-author{ font-weight:700; font-size:13.5px; color:var(--ink); }
+  .review-date{ font-size:11.5px; color:var(--ink-soft); }
+  .review-text{ font-size:13px; line-height:1.6; color:var(--ink); margin:0; }
+  .reviews-link{
+    display:block;
+    text-align:center;
+    margin-top:14px;
+    font-size:13px;
+    font-weight:600;
+    color:var(--rose-deep);
+    text-decoration:none;
+  }
+  .reviews-link:hover{ text-decoration:underline; }
+
+  /* ============== ADMIN-SPECIFIC ============== */
+  .tabs{ display:flex; background:var(--card); border-radius:14px; padding:5px; box-shadow:var(--shadow); margin-bottom:18px; }
+  .tab{ flex:1; text-align:center; padding:11px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; color:var(--ink-soft); transition:.2s; }
+  .tab.active{ background:var(--rose-deep); color:#fff; }
+
+  .week-nav{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .week-nav button{ width:32px;height:32px;border-radius:50%; border:1.5px solid var(--line); background:var(--bg-soft); cursor:pointer; font-size:15px; }
+  .week-label{ font-family:'Marcellus', serif; font-size:15px; }
+
+  .day-row{ padding:14px 0; border-bottom:1px solid var(--line); }
+  .day-row:last-child{ border-bottom:none; }
+  .day-info-row{ display:flex; align-items:center; gap:10px; }
+  .day-info{ width:84px; flex-shrink:0; }
+  .day-name{ font-weight:700; font-size:14px; }
+  .day-date{ font-size:11.5px; color:var(--ink-soft); }
+  .day-off-label{ font-size:12.5px; color:var(--ink-soft); font-style:italic; }
+  .toggle{ position:relative; width:42px;height:24px; border-radius:12px; background:var(--line); cursor:pointer; flex-shrink:0; transition:.2s; }
+  .toggle.on{ background:var(--good); }
+  .toggle::after{ content:""; position:absolute; top:2px; left:2px; width:20px;height:20px; border-radius:50%; background:#fff; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+  .toggle.on::after{ left:20px; }
+
+  .intervals-wrap{ margin-top:12px; padding-left:94px; }
+  .intervals-list{ display:flex; flex-direction:column; gap:8px; }
+  .interval-row{ display:flex; align-items:center; gap:8px; }
+  .time-input{ width:78px; padding:9px 6px; border-radius:9px; border:1.5px solid var(--line); font-family:'Manrope'; font-size:13px; background:var(--bg-soft); color:var(--ink); }
+  .time-sep{ color:var(--ink-soft); font-size:13px; }
+  .remove-interval-btn{
+    width:26px; height:26px; border-radius:50%; border:1.5px solid var(--line);
+    background:var(--bg-soft); color:var(--ink-soft); font-size:12px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; padding:0;
+  }
+  .remove-interval-btn:hover{ border-color:var(--rose-deep); color:var(--rose-deep); }
+  .add-interval-btn{
+    margin-top:8px; background:none; border:none; color:var(--bronze); font-size:12.5px;
+    font-weight:700; cursor:pointer; padding:4px 0; font-family:'Manrope';
+  }
+  .add-interval-btn:hover{ color:var(--rose-deep); }
+
+  @media (max-width: 380px){
+    .intervals-wrap{ padding-left:0; margin-top:10px; }
+    .time-input{ width:72px; }
+  }
+
+  .save-status{ text-align:center; font-size:12.5px; color:var(--good); margin-top:10px; min-height:16px; }
+
+  .booking-card{ border:1.5px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px; background:var(--bg-soft); }
+  .booking-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+  .booking-date{ font-family:'Marcellus', serif; font-size:15px; }
+  .booking-time{ font-weight:700; color:var(--rose-deep); }
+  .booking-service{ font-size:13.5px; margin-bottom:4px; }
+  .booking-client{ font-size:13px; color:var(--ink-soft); }
+  .booking-comment{ font-size:12.5px; color:var(--ink-soft); font-style:italic; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
+  .cancel-booking-btn{
+    margin-top:10px;
+    width:100%;
+    padding:9px;
+    border-radius:9px;
+    border:1.5px solid var(--line);
+    background:transparent;
+    color:var(--rose-deep);
+    font-family:'Manrope';
+    font-weight:700;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .cancel-booking-btn:hover{ background:rgba(176,126,126,0.08); }
+  .cancel-booking-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .hidden{ display:none !important; }
+
+  @media (prefers-reduced-motion: reduce){ .panel{ animation:none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <svg class="crest" viewBox="0 0 100 100" fill="none">
+      <path d="M50 15 C 35 25, 20 45, 50 90 C 80 45, 65 25, 50 15 Z" stroke="#B07E7E" stroke-width="2.5"/>
+      <circle cx="50" cy="40" r="6" fill="#C99A9A"/>
+    </svg>
+    <h1 class="brand-name">РАЙ</h1>
+    <div class="brand-tagline">место, куда хочется вернуться</div>
+    <div class="brand-sub" id="brandSub">Массажный салон · Онлайн-запись</div>
+    <svg class="swoosh" viewBox="0 0 120 14"><path d="M0 7 C 30 -5, 50 18, 80 5 C 95 -1, 105 7, 120 7" stroke="#B07E7E" stroke-width="1.5" fill="none"/></svg>
+  </header>
+
+  <div id="clientView">
+  
+
+    <div class="steps" id="stepsIndicator">
+      <div class="step-dot" data-step="1"></div>
+      <div class="step-dot" data-step="2"></div>
+      <div class="step-dot" data-step="3"></div>
+      <div class="step-dot" data-step="4"></div>
+    </div>
+
+    <div class="panel" id="step1">
+      <h2>Выберите услугу</h2>
+      <p class="hint">Нажмите на процедуру, чтобы продолжить</p>
+      <div id="servicesList"></div>
+    </div>
+
+    <div class="cancel-link-wrap">
+      <a id="openCancelLink">Нужно отменить запись?</a>
+    </div>
+    <div class="panel hidden" id="cancelPanel">
+      <h2 style="font-size:17px;">Отмена записи</h2>
+      <p class="hint">Введите 6-значный код, который вы получили при записи</p>
+      <div class="field">
+        <input type="text" id="cancelCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" style="text-align:center; font-size:20px; letter-spacing:0.2em; font-weight:700;">
+      </div>
+      <button class="btn btn-primary" id="submitCancelCode">Отменить запись</button>
+      <div class="save-status" id="cancelStatus"></div>
+    </div>
+
+    <div class="panel hidden" id="step2">
+      <h2>Дата и время</h2>
+      <p class="hint" id="step2hint">Выберите удобный день</p>
+
+      <div class="cal-head">
+        <button class="cal-nav-btn" id="prevMonth">‹</button>
+        <div class="cal-month" id="calMonthLabel"></div>
+        <button class="cal-nav-btn" id="nextMonth">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+
+      <div id="slotsSection" class="hidden">
+        <div class="slots-title">Свободное время</div>
+        <div class="slots-grid" id="slotsGrid"></div>
+      </div>
+
+      <div class="btn-row" style="margin-top:22px;">
+        <button class="btn btn-ghost" id="backTo1">← Назад</button>
+        <button class="btn btn-primary" id="toStep3" disabled>Продолжить</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="step3">
+      <h2>Ваши данные</h2>
+      <p class="hint">Дарья свяжется с вами для подтверждения</p>
+
+      <div class="summary" id="bookingSummary"></div>
+
+      <div class="field">
+        <label for="clientName">Имя</label>
+        <input type="text" id="clientName" placeholder="Как вас зовут?">
+      </div>
+      <div class="field">
+        <label for="clientPhone">Телефон</label>
+        <input type="tel" id="clientPhone" placeholder="+7 900 000-00-00">
+      </div>
+      <div class="field">
+        <label for="clientComment">Комментарий <span style="text-transform:none; font-weight:400;">(не обязательно)</span></label>
+        <input type="text" id="clientComment" placeholder="Например: есть пожелания по маслу">
+      </div>
+
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-ghost" id="backTo2">← Назад</button>
+        <button class="btn btn-primary" id="submitBooking">Записаться</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="step4">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <h2 class="confirm-title">Запись принята</h2>
+      <p class="confirm-sub">Дарья получила уведомление и подтвердит запись лично — ожидайте звонок или сообщение.</p>
+      <div class="confirm-details" id="confirmDetails"></div>
+
+      <div class="cancel-code-box">
+        <div class="cancel-code-label">Код отмены записи</div>
+        <div class="cancel-code-value" id="cancelCodeDisplay"></div>
+        <div class="cancel-code-hint">Сохраните его — он понадобится, если нужно будет отменить запись</div>
+      </div>
+
+      <button class="btn btn-primary" style="margin-top:16px;" id="newBooking">Записаться ещё раз</button>
+      <button class="btn btn-ghost" style="margin-top:4px;" id="cancelFromConfirm">Отменить эту запись</button>
+    </div>
+
+    <div class="panel reviews-panel" id="reviewsPanel">
+      <div class="reviews-header">
+        <div>
+          <h2 style="font-size:18px; margin-bottom:2px;">Отзывы клиентов</h2>
+          <div class="reviews-rating">
+            <span class="reviews-stars">★★★★★</span>
+            <span class="reviews-score">5.0</span>
+            <span class="reviews-count">· 55 оценок на Яндекс Картах</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="review-card">
+        <div class="review-top">
+          <span class="review-author">Юля Ф.</span>
+          <span class="review-date">12 мая</span>
+        </div>
+        <p class="review-text">Долго выбирала студию массажа и читала отзывы — название «Рай» сначала показалось пафосным, но впечатления полностью его оправдали. Сразу порадовала идеальная чистота, а сам массаж подарил полное расслабление — особенно процедуры с кедровой бочкой и скрабом. Дарья оказалась внимательным и тактичным мастером, подробно рассказала о процедурах и помогла выбрать то, что нужно именно ей.</p>
+      </div>
+
+      <div class="review-card">
+        <div class="review-top">
+          <span class="review-author">Анна Ф.</span>
+          <span class="review-date">18 марта</span>
+        </div>
+        <p class="review-text">Прошла детокс-программу и осталась под очень приятным впечатлением. Дарья — внимательный мастер, который продумывает каждую деталь: кедровая бочка для расслабления и прогрева, мягкое скрабирование, глубокий массаж и обёртывание с водорослями. Три часа в уютной атмосфере пролетели незаметно, а тело и душа получили полный отдых.</p>
+      </div>
+
+      <div class="review-card">
+        <div class="review-top">
+          <span class="review-author">Людмила Я.</span>
+          <span class="review-date">8 мая</span>
+        </div>
+        <p class="review-text">Осталась в полном восторге от работы мастера. Понравился профессиональный подход: чётко определили зоны напряжения, учли все пожелания и подобрали подходящую технику. Спокойная музыка и приятная атмосфера помогли полностью расслабиться во время процедуры.</p>
+      </div>
+
+      <a class="reviews-link" href="https://yandex.ru/maps/-/CTURVCKZ" target="_blank" rel="noopener">Смотреть все 55 отзывов на Яндекс Картах →</a>
+    </div>
+
+    <footer>
+      ул. Гидростроителей 67<br>
+      8-903-458-55-70
+    </footer>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// УСЛУГИ САЛОНА "РАЙ"
+// Чтобы изменить цену, длительность или добавить/убрать услугу —
+// просто отредактируйте этот список.
+// ============================================================
+
+const SERVICE_CATEGORIES = [
+  {
+    category: "Массаж тела",
+    note: "При покупке курса от 10 сеансов любого массажа тела — скидка 10% на стоимость",
+    services: [
+      { id: "body_classic_60", name: "Классический массаж тела", duration: 60, price: 2200 },
+      { id: "body_classic_90", name: "Классический массаж тела", duration: 90, price: 2800 },
+      { id: "body_relax", name: "Расслабляющий массаж", duration: 60, price: 2200 },
+      { id: "body_lymph", name: "Лимфодренажный массаж", duration: 70, price: 2200 },
+      { id: "back_neck", name: "Массаж спины и ШВЗ", duration: 40, price: 1500 },
+      { id: "neck_only", name: "Массаж зоны ШВЗ", duration: 20, price: 1000 },
+      { id: "anticellulite", name: "Антицеллюлитный массаж (разовое посещение)", duration: 60, price: 2500 },
+      { id: "anticellulite_90", name: "Антицеллюлитный массаж (разовое посещение)", duration: 90, price: 3200 },
+      { id: "figure_60", name: "Коррекция фигуры — комплекс", duration: 60, price: 2200 },
+      { id: "figure_90", name: "Коррекция фигуры — комплекс", duration: 90, price: 2800 },
+    ]
+  },
+  {
+    category: "Массаж лица",
+    services: [
+      { id: "face_classic", name: "Классический массаж лица", duration: 30, price: 1200 },
+      { id: "face_plastic", name: "Пластический массаж лица", duration: 70, price: 2000 },
+      { id: "face_alginate", name: "Альгинатная маска", duration: 20, price: 300 },
+    ]
+  },
+  {
+    category: "SPA-программы",
+    services: [
+      { id: "spa_relax", name: "SPA-программа «Релакс»", duration: 120, price: 4000 },
+      { id: "spa_bounty", name: "SPA-программа «Баунти»", duration: 140, price: 4300 },
+      { id: "spa_paradise", name: "SPA-программа «Райское наслаждение»", duration: 160, price: 5000 },
+      { id: "spa_detox", name: "SPA-программа «Детокс»", duration: 190, price: 5700 },
+    ]
+  },
+  {
+    category: "Аппаратный массаж",
+    services: [
+      { id: "microcurrent_face", name: "Микротоки по лицу", duration: 30, price: 1500 },
+      { id: "rf_face", name: "RF лифтинг по лицу", duration: 30, price: 800 },
+      { id: "rf_body", name: "RF лифтинг по телу (1 зона)", duration: 30, price: 800 },
+      { id: "vacuum", name: "Вакуумный массаж (1 зона)", duration: 30, price: 1000 },
+      { id: "vibro", name: "Вибрационный массаж", duration: 30, price: 1000 },
+      { id: "presso", name: "Прессотерапия", duration: 30, price: 700 },
+      { id: "cedar_barrel", name: "Кедровая бочка", duration: 15, price: 700 },
+      { id: "spider", name: "Аппарат «Паук»", duration: 30, price: 500 },
+      { id: "myostim", name: "Миостимуляция", duration: 30, price: 500 },
+    ]
+  }
+];
+
+function getServiceById(id) {
+  for (const cat of SERVICE_CATEGORIES) {
+    const found = cat.services.find(s => s.id === id);
+    if (found) return found;
+  }
+  return null;
+}
+
+function formatDuration(minutes) {
+  if (minutes < 60) return `${minutes} мин`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (m === 0) return `${h} ч`;
+  return `${h} ч ${m} мин`;
+}
+
+// ============================================================
+// TELEGRAM-УВЕДОМЛЕНИЯ ДЛЯ МАСТЕРА
+// ============================================================
+
+const TELEGRAM_CONFIG = {
+  BOT_TOKEN: '8849011621:AAFNa-S1jVaiyZT3FXVW4I-XKadejeeA43I',
+  CHAT_ID: '5005567779',
+};
+
+async function notifyMaster(booking){
+  const { BOT_TOKEN, CHAT_ID } = TELEGRAM_CONFIG;
+
+  if (!BOT_TOKEN || BOT_TOKEN.startsWith('ВСТАВЬТЕ') || !CHAT_ID || CHAT_ID.startsWith('ВСТАВЬТЕ')){
+    console.warn('Telegram-бот не настроен — уведомление не отправлено.');
+    return;
+  }
+
+  const dateObj = new Date(booking.date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+
+  const text =
+`✨ Новая запись — РАЙ
+
+💆 ${booking.serviceName}
+📅 ${dateStr}
+🕐 ${booking.start}–${booking.end}
+💰 ${booking.servicePrice.toLocaleString('ru-RU')} ₽
+
+👤 ${booking.clientName}
+📞 ${booking.clientPhone}` +
+(booking.comment ? `\n📝 ${booking.comment}` : '');
+
+  try{
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: CHAT_ID, text: text })
+    });
+  }catch(e){
+    console.error('Ошибка отправки в Telegram:', e);
+  }
+}
+
+// ============================================================
+// ОБЩИЕ УТИЛИТЫ ДАТЫ/ВРЕМЕНИ
+// ============================================================
+
+function pad(n){ return n.toString().padStart(2,'0'); }
+function dateKeyFromParts(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
+function dateKeyFromDate(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function todayKey(){ const t = new Date(); return dateKeyFromParts(t.getFullYear(), t.getMonth(), t.getDate()); }
+function timeToMinutes(t){ const [h,m] = t.split(':').map(Number); return h*60+m; }
+function minutesToTime(mins){ const h = Math.floor(mins/60); const m = mins%60; return `${pad(h)}:${pad(m)}`; }
+
+// ============================================================
+// ОБЩЕЕ ХРАНИЛИЩЕ (используется и клиентом, и мастером)
+// ============================================================
+
+// ============================================================
+// НАСТРОЙКИ SUPABASE
+// ============================================================
+const SUPABASE_URL = 'https://zjizxpgjhgpjprvmugdg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_a0F9UlNdtEz7PYNedQmMXA_kfbe9jLo';
+
+const sb = {
+  headers: {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json',
+  },
+  url(table, query){
+    return `${SUPABASE_URL}/rest/v1/${table}${query ? '?' + query : ''}`;
+  },
+  async select(table, query){
+    const res = await fetch(this.url(table, query), { headers: this.headers });
+    if (!res.ok) throw new Error('supabase-select-failed: ' + res.status);
+    return res.json();
+  },
+  async upsert(table, rows){
+    const res = await fetch(this.url(table), {
+      method: 'POST',
+      headers: { ...this.headers, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(rows)
+    });
+    if (!res.ok) throw new Error('supabase-upsert-failed: ' + res.status);
+  },
+  async deleteWhere(table, query){
+    const res = await fetch(this.url(table, query), {
+      method: 'DELETE',
+      headers: this.headers
+    });
+    if (!res.ok) throw new Error('supabase-delete-failed: ' + res.status);
+  }
+};
+
+const Store = {
+  schedule: {},
+  bookings: [],
+
+  async loadSchedule(){
+    try{
+      const rows = await sb.select('schedule', 'select=date,intervals');
+      const obj = {};
+      rows.forEach(r => { obj[r.date] = r.intervals; });
+      this.schedule = obj;
+    }catch(e){
+      console.error('loadSchedule error:', e);
+      this.schedule = {};
+    }
+  },
+
+  async loadBookings(){
+    try{
+      const rows = await sb.select('bookings', 'select=*');
+      this.bookings = rows.map(r => ({
+        id: r.id,
+        cancelCode: r.cancel_code,
+        date: r.date,
+        start: r.start_time,
+        end: r.end_time,
+        serviceName: r.service_name,
+        serviceDuration: r.service_duration,
+        servicePrice: r.service_price,
+        clientName: r.client_name,
+        clientPhone: r.client_phone,
+        comment: r.comment || '',
+        createdAt: r.created_at
+      }));
+    }catch(e){
+      console.error('loadBookings error:', e);
+      this.bookings = [];
+    }
+  },
+
+  // Persist the full in-memory schedule to Supabase: upsert every day that
+  // currently has intervals, and delete any day that was removed locally.
+  async saveSchedule(){
+    const days = Object.keys(this.schedule);
+    if (days.length > 0){
+      const rows = days.map(date => ({ date, intervals: this.schedule[date] }));
+      await sb.upsert('schedule', rows);
+    }
+    // Remove days no longer present locally (only within the week being edited
+    // is handled by the caller; here we just sync what's in memory).
+  },
+
+  async deleteScheduleDay(dateKey){
+    await sb.deleteWhere('schedule', `date=eq.${dateKey}`);
+  },
+
+  async saveNewBooking(booking){
+    await sb.upsert('bookings', [{
+      id: booking.id,
+      cancel_code: booking.cancelCode,
+      date: booking.date,
+      start_time: booking.start,
+      end_time: booking.end,
+      service_name: booking.serviceName,
+      service_duration: booking.serviceDuration,
+      service_price: booking.servicePrice,
+      client_name: booking.clientName,
+      client_phone: booking.clientPhone,
+      comment: booking.comment || null
+    }]);
+  },
+
+  async deleteBooking(bookingId){
+    await sb.deleteWhere('bookings', `id=eq.${bookingId}`);
+  }
+};
+
+function withTimeout(promise, ms){
+  const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms));
+  return Promise.race([promise, timeout]);
+}
+
+// ============================================================
+
+
+// ============================================================
+// ===================  CLIENT-SIDE LOGIC  ====================
+// ============================================================
+
+const DOW_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const MONTH_LABELS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+const clientState = {
+  selectedService: null,
+  calendarMonth: new Date().getMonth(),
+  calendarYear: new Date().getFullYear(),
+  selectedDate: null,
+  selectedSlot: null,
+};
+
+function renderServices(){
+  const container = document.getElementById('servicesList');
+  container.innerHTML = '';
+  SERVICE_CATEGORIES.forEach(cat => {
+    const label = document.createElement('div');
+    label.className = 'category-label';
+    label.textContent = cat.category;
+    container.appendChild(label);
+
+    if (cat.note){
+      const note = document.createElement('div');
+      note.className = 'category-note';
+      note.textContent = cat.note;
+      container.appendChild(note);
+    }
+
+    cat.services.forEach(svc => {
+      const el = document.createElement('div');
+      el.className = 'service';
+      el.dataset.id = svc.id;
+      el.innerHTML = `
+        <div>
+          <div class="service-name">${svc.name}</div>
+          <div class="service-meta">${formatDuration(svc.duration)}</div>
+        </div>
+        <div class="service-price">${svc.price.toLocaleString('ru-RU')} ₽</div>
+      `;
+      el.addEventListener('click', () => selectService(svc.id));
+      container.appendChild(el);
+    });
+  });
+}
+
+function selectService(id){
+  clientState.selectedService = getServiceById(id);
+  document.querySelectorAll('.service').forEach(el=>{
+    el.classList.toggle('selected', el.dataset.id === id);
+  });
+  setTimeout(() => goToStep(2), 180);
+}
+
+function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
+  const intervals = Store.schedule[dateKeyStr];
+  if (!intervals || !Array.isArray(intervals) || intervals.length === 0) return [];
+
+  const bookingsToday = Store.bookings.filter(b => b.date === dateKeyStr);
+  const slots = [];
+  const STEP = 15;
+
+  intervals.forEach(interval => {
+    if (!interval.start || !interval.end) return;
+    const dayStart = timeToMinutes(interval.start);
+    const dayEnd = timeToMinutes(interval.end);
+
+    for (let t = dayStart; t + durationMinutes <= dayEnd; t += STEP) {
+      const slotStart = t;
+      const slotEnd = t + durationMinutes;
+
+      if (dateKeyStr === todayKey()) {
+        const now = new Date();
+        const nowMinutes = now.getHours()*60 + now.getMinutes();
+        if (slotStart <= nowMinutes + 30) continue;
+      }
+
+      const overlaps = bookingsToday.some(b => {
+        const bStart = timeToMinutes(b.start);
+        const bEnd = timeToMinutes(b.end);
+        return slotStart < bEnd && slotEnd > bStart;
+      });
+
+      if (!overlaps) slots.push(minutesToTime(slotStart));
+    }
+  });
+
+  // dedupe + sort, in case intervals overlap or produce the same slot twice
+  return [...new Set(slots)].sort();
+}
+
+function dateHasAnySlots(dateKeyStr){
+  if (!clientState.selectedService) return false;
+  const intervals = Store.schedule[dateKeyStr];
+  if (!intervals || !Array.isArray(intervals) || intervals.length === 0) return false;
+  return getAvailableSlotsForDate(dateKeyStr, clientState.selectedService.duration).length > 0;
+}
+
+function renderCalendar(){
+  const y = clientState.calendarYear;
+  const m = clientState.calendarMonth;
+
+  document.getElementById('calMonthLabel').textContent = `${MONTH_LABELS[m]} ${y}`;
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+
+  DOW_LABELS.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDay = new Date(y, m, 1);
+  let startOffset = firstDay.getDay() - 1;
+  if (startOffset < 0) startOffset = 6;
+
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+
+  for (let i=0; i<startOffset; i++){
+    const el = document.createElement('div');
+    el.className = 'cal-day empty';
+    grid.appendChild(el);
+  }
+
+  const tKey = todayKey();
+
+  for (let d=1; d<=daysInMonth; d++){
+    const key = dateKeyFromParts(y,m,d);
+    const el = document.createElement('div');
+    el.textContent = d;
+    el.classList.add('cal-day');
+
+    const isPast = key < tKey;
+    const hasSlots = !isPast && dateHasAnySlots(key);
+
+    if (key === tKey) el.classList.add('today');
+    if (isPast) {
+      el.classList.add('past');
+    } else if (hasSlots) {
+      el.classList.add('available');
+      el.addEventListener('click', () => selectDate(key));
+    } else {
+      el.classList.add('no-slots');
+    }
+
+    if (clientState.selectedDate === key) el.classList.add('selected');
+
+    grid.appendChild(el);
+  }
+
+  const now = new Date();
+  const prevBtn = document.getElementById('prevMonth');
+  prevBtn.disabled = (y === now.getFullYear() && m === now.getMonth());
+}
+
+function selectDate(key){
+  clientState.selectedDate = key;
+  clientState.selectedSlot = null;
+  renderCalendar();
+  renderSlots();
+  document.getElementById('toStep3').disabled = true;
+}
+
+function renderSlots(){
+  const section = document.getElementById('slotsSection');
+  const grid = document.getElementById('slotsGrid');
+  grid.innerHTML = '';
+
+  if (!clientState.selectedDate){
+    section.classList.add('hidden');
+    return;
+  }
+
+  const slots = getAvailableSlotsForDate(clientState.selectedDate, clientState.selectedService.duration);
+
+  if (slots.length === 0){
+    section.classList.remove('hidden');
+    grid.innerHTML = `<div class="empty-state" style="grid-column: 1 / -1;">На этот день свободного времени не осталось. Попробуйте другой день.</div>`;
+    return;
+  }
+
+  section.classList.remove('hidden');
+  slots.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'slot';
+    el.textContent = s;
+    if (clientState.selectedSlot === s) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      clientState.selectedSlot = s;
+      document.querySelectorAll('.slot').forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('toStep3').disabled = false;
+    });
+    grid.appendChild(el);
+  });
+}
+
+function goToStep(n){
+  [1,2,3,4].forEach(i => {
+    document.getElementById('step'+i).classList.toggle('hidden', i !== n);
+  });
+  document.querySelectorAll('.step-dot').forEach(dot => {
+    const s = Number(dot.dataset.step);
+    dot.classList.toggle('active', s === n);
+    dot.classList.toggle('done', s < n);
+  });
+
+  // Reviews and "cancel by code" link are only relevant on the service-selection step
+  document.getElementById('reviewsPanel').classList.toggle('hidden', n !== 1);
+  document.querySelector('.cancel-link-wrap').classList.toggle('hidden', n !== 1);
+
+  if (n === 2){
+    document.getElementById('step2hint').textContent =
+      `${clientState.selectedService.name} · ${formatDuration(clientState.selectedService.duration)}`;
+    renderCalendar();
+    renderSlots();
+  }
+  if (n === 3){
+    renderSummary();
+  }
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function renderSummary(){
+  const svc = clientState.selectedService;
+  const dateObj = new Date(clientState.selectedDate + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+
+  document.getElementById('bookingSummary').innerHTML = `
+    <div class="summary-row"><span class="label">Услуга</span><span>${svc.name}</span></div>
+    <div class="summary-row"><span class="label">Дата</span><span>${dateStr}</span></div>
+    <div class="summary-row"><span class="label">Время</span><span>${clientState.selectedSlot}</span></div>
+    <div class="summary-row total"><span class="label">К оплате</span><span>${svc.price.toLocaleString('ru-RU')} ₽</span></div>
+  `;
+}
+
+async function submitBooking(){
+  const name = document.getElementById('clientName').value.trim();
+  const phone = document.getElementById('clientPhone').value.trim();
+  const comment = document.getElementById('clientComment').value.trim();
+
+  if (!name || !phone){
+    alert('Пожалуйста, заполните имя и телефон');
+    return;
+  }
+
+  const svc = clientState.selectedService;
+  const startMinutes = timeToMinutes(clientState.selectedSlot);
+  const endTime = minutesToTime(startMinutes + svc.duration);
+
+  const booking = {
+    id: 'bk_' + Date.now(),
+    cancelCode: generateCancelCode(),
+    date: clientState.selectedDate,
+    start: clientState.selectedSlot,
+    end: endTime,
+    serviceName: svc.name,
+    serviceDuration: svc.duration,
+    servicePrice: svc.price,
+    clientName: name,
+    clientPhone: phone,
+    comment: comment,
+    createdAt: new Date().toISOString()
+  };
+
+  const btn = document.getElementById('submitBooking');
+  btn.disabled = true;
+  btn.textContent = 'Отправляем...';
+
+  try{
+    await withTimeout(Store.saveNewBooking(booking), 8000);
+    Store.bookings.push(booking);
+    await notifyMaster(booking);
+    showConfirmation(booking);
+  }catch(e){
+    console.error('Booking submission error:', e);
+    let msg = 'Не удалось отправить запись. Попробуйте ещё раз.';
+    if (e && e.message === 'timeout'){
+      msg = 'Сервер не отвечает. Проверьте соединение и попробуйте снова.';
+    } else if (e && String(e.message).includes('supabase')){
+      msg = 'Не удалось подключиться к серверу. Проверьте интернет и попробуйте снова.';
+    }
+    alert(msg);
+    btn.disabled = false;
+    btn.textContent = 'Записаться';
+  }
+}
+
+function generateCancelCode(){
+  return String(Math.floor(100000 + Math.random()*900000)); // 6-digit code
+}
+
+function showConfirmation(booking){
+  const dateObj = new Date(booking.date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+
+  document.getElementById('confirmDetails').innerHTML = `
+    <div class="row"><span>Услуга</span><span>${booking.serviceName}</span></div>
+    <div class="row"><span>Дата</span><span>${dateStr}</span></div>
+    <div class="row"><span>Время</span><span>${booking.start}–${booking.end}</span></div>
+    <div class="row"><span>Имя</span><span>${booking.clientName}</span></div>
+    <div class="row"><span>Телефон</span><span>${booking.clientPhone}</span></div>
+  `;
+  document.getElementById('cancelCodeDisplay').textContent = booking.cancelCode;
+  clientState.lastBookingId = booking.id;
+  goToStep(4);
+}
+
+async function cancelBookingByCode(code, fromConfirmScreen){
+  const trimmed = (code || '').trim();
+  if (!/^\d{6}$/.test(trimmed)){
+    return { ok:false, message:'Введите 6-значный код отмены из подтверждения записи.' };
+  }
+
+  const idx = Store.bookings.findIndex(b => b.cancelCode === trimmed);
+  if (idx === -1){
+    return { ok:false, message:'Запись с таким кодом не найдена. Возможно, она уже отменена.' };
+  }
+
+  const booking = Store.bookings[idx];
+  const dateObj = new Date(booking.date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
+
+  try{
+    await withTimeout(Store.deleteBooking(booking.id), 8000);
+    Store.bookings.splice(idx, 1);
+    return { ok:true, message:`Запись на ${dateStr}, ${booking.start} отменена.`, booking };
+  }catch(e){
+    return { ok:false, message:'Не удалось отменить запись — проблема с подключением. Попробуйте снова.' };
+  }
+}
+
+function resetBooking(){
+  clientState.selectedService = null;
+  clientState.selectedDate = null;
+  clientState.selectedSlot = null;
+  document.getElementById('clientName').value = '';
+  document.getElementById('clientPhone').value = '';
+  document.getElementById('clientComment').value = '';
+  document.getElementById('submitBooking').disabled = false;
+  document.getElementById('submitBooking').textContent = 'Записаться';
+  document.querySelectorAll('.service').forEach(el=>el.classList.remove('selected'));
+  goToStep(1);
+}
+
+// ============================================================
+// INIT — клиентская страница
+// ============================================================
+async function init(){
+  renderServices();
+  await Store.loadSchedule();
+  await Store.loadBookings();
+  renderCalendar(); // refresh now that schedule/bookings are loaded
+
+  document.getElementById('prevMonth').addEventListener('click', () => {
+    clientState.calendarMonth--;
+    if (clientState.calendarMonth < 0){ clientState.calendarMonth = 11; clientState.calendarYear--; }
+    clientState.selectedDate = null;
+    clientState.selectedSlot = null;
+    renderCalendar();
+    renderSlots();
+  });
+  document.getElementById('nextMonth').addEventListener('click', () => {
+    clientState.calendarMonth++;
+    if (clientState.calendarMonth > 11){ clientState.calendarMonth = 0; clientState.calendarYear++; }
+    clientState.selectedDate = null;
+    clientState.selectedSlot = null;
+    renderCalendar();
+    renderSlots();
+  });
+  document.getElementById('backTo1').addEventListener('click', () => goToStep(1));
+  document.getElementById('toStep3').addEventListener('click', () => goToStep(3));
+  document.getElementById('backTo2').addEventListener('click', () => goToStep(2));
+  document.getElementById('submitBooking').addEventListener('click', submitBooking);
+  document.getElementById('newBooking').addEventListener('click', resetBooking);
+
+  document.getElementById('cancelFromConfirm').addEventListener('click', async () => {
+    const btn = document.getElementById('cancelFromConfirm');
+    const code = document.getElementById('cancelCodeDisplay').textContent;
+    btn.disabled = true;
+    btn.textContent = 'Отменяем...';
+    const result = await cancelBookingByCode(code, true);
+    if (result.ok){
+      alert('Запись отменена. ' + result.message);
+      resetBooking();
+    } else {
+      alert(result.message);
+      btn.disabled = false;
+      btn.textContent = 'Отменить эту запись';
+    }
+  });
+
+  document.getElementById('openCancelLink').addEventListener('click', () => {
+    document.getElementById('cancelPanel').classList.toggle('hidden');
+  });
+  document.getElementById('submitCancelCode').addEventListener('click', async () => {
+    const input = document.getElementById('cancelCodeInput');
+    const btn = document.getElementById('submitCancelCode');
+    const status = document.getElementById('cancelStatus');
+    btn.disabled = true;
+    btn.textContent = 'Проверяем...';
+    status.textContent = '';
+    const result = await cancelBookingByCode(input.value, false);
+    status.textContent = result.message;
+    status.style.color = result.ok ? 'var(--good)' : '#B07E7E';
+    if (result.ok){
+      input.value = '';
+      renderCalendar();
+    }
+    btn.disabled = false;
+    btn.textContent = 'Отменить запись';
+  });
+}
+
+document.addEventListener('DOMContentLoaded', init);
+
+
+</script>
+</body>
+</html>
