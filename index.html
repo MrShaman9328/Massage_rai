@@ -55,7 +55,7 @@
     font-style:italic;
     font-size:22px;
     letter-spacing:0.03em;
-    color:var(--bronze);
+    color:var(--ink);
     margin-top:6px;
   }
   .brand-sub{ font-family:'Manrope', sans-serif; font-size:11px; letter-spacing:0.22em; text-transform:uppercase; color:var(--ink-soft); margin-top:6px; }
@@ -98,8 +98,9 @@
   .category-label{
     font-family:'Cormorant Garamond', serif;
     font-style:italic;
-    font-size:15px;
-    color:var(--bronze);
+    font-weight:600;
+    font-size:21px;
+    color:var(--rose-deep);
     margin:22px 0 10px;
     padding-bottom:6px;
     border-bottom:1px solid var(--line);
@@ -187,15 +188,23 @@
   .confirm-details .row{ display:flex; justify-content:space-between; padding:7px 0; font-size:13.5px; border-bottom:1px solid var(--line); }
   .confirm-details .row:last-child{ border-bottom:none; }
 
-  .cancel-link-wrap{ text-align:center; margin-bottom:18px; }
-  .cancel-link-wrap a{
-    font-size:12.5px;
-    color:var(--ink-soft);
-    text-decoration:underline;
-    text-decoration-color: var(--line);
+  .cancel-entry{ text-align:center; margin-bottom:16px; }
+  .cancel-entry a{
+    display:inline-block;
+    width:100%;
+    box-sizing:border-box;
+    padding:13px 16px;
+    border-radius:14px;
+    border:1.5px solid var(--line);
+    background:var(--card);
+    box-shadow: 0 8px 20px -12px rgba(58,44,41,0.18);
+    font-size:13.5px;
+    font-weight:700;
+    color:var(--rose-deep);
+    text-decoration:none;
     cursor:pointer;
-    opacity:0.75;
   }
+  .cancel-entry a:hover{ border-color:var(--rose); }
   .cancel-code-box{
     background:var(--bg-soft);
     border:1.5px dashed var(--line);
@@ -225,6 +234,14 @@
   }
 
   footer{ text-align:center; margin-top:30px; font-size:12px; color:var(--ink-soft); line-height:1.7; }
+  .footer-instagram{
+    display:inline-block;
+    margin-top:6px;
+    color:var(--rose-deep);
+    font-weight:700;
+    text-decoration:none;
+  }
+  .footer-instagram:hover{ text-decoration:underline; }
 
   /* ---------- Reviews ---------- */
   .reviews-panel{ margin-top:8px; }
@@ -350,6 +367,19 @@
   <div id="clientView">
   
 
+    <div class="cancel-entry">
+      <a id="openCancelLink">Отмена ранее забронированного времени</a>
+    </div>
+    <div class="panel hidden" id="cancelPanel">
+      <h2 style="font-size:17px;">Отмена записи</h2>
+      <p class="hint">Введите 6-значный код, который вы получили при записи</p>
+      <div class="field">
+        <input type="text" id="cancelCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" style="text-align:center; font-size:20px; letter-spacing:0.2em; font-weight:700;">
+      </div>
+      <button class="btn btn-primary" id="submitCancelCode">Отменить запись</button>
+      <div class="save-status" id="cancelStatus"></div>
+    </div>
+
     <div class="steps" id="stepsIndicator">
       <div class="step-dot" data-step="1"></div>
       <div class="step-dot" data-step="2"></div>
@@ -361,19 +391,6 @@
       <h2>Выберите услугу</h2>
       <p class="hint">Нажмите на процедуру, чтобы продолжить</p>
       <div id="servicesList"></div>
-    </div>
-
-    <div class="cancel-link-wrap">
-      <a id="openCancelLink">Нужно отменить запись?</a>
-    </div>
-    <div class="panel hidden" id="cancelPanel">
-      <h2 style="font-size:17px;">Отмена записи</h2>
-      <p class="hint">Введите 6-значный код, который вы получили при записи</p>
-      <div class="field">
-        <input type="text" id="cancelCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" style="text-align:center; font-size:20px; letter-spacing:0.2em; font-weight:700;">
-      </div>
-      <button class="btn btn-primary" id="submitCancelCode">Отменить запись</button>
-      <div class="save-status" id="cancelStatus"></div>
     </div>
 
     <div class="panel hidden" id="step2">
@@ -406,15 +423,15 @@
 
       <div class="field">
         <label for="clientName">Имя</label>
-        <input type="text" id="clientName" placeholder="Как вас зовут?">
+        <input type="text" id="clientName" placeholder="Как вас зовут?" maxlength="30">
       </div>
       <div class="field">
         <label for="clientPhone">Телефон</label>
-        <input type="tel" id="clientPhone" placeholder="+7 900 000-00-00">
+        <input type="tel" id="clientPhone" placeholder="+7 900 000-00-00" maxlength="18" inputmode="tel">
       </div>
       <div class="field">
         <label for="clientComment">Комментарий <span style="text-transform:none; font-weight:400;">(не обязательно)</span></label>
-        <input type="text" id="clientComment" placeholder="Например: есть пожелания по маслу">
+        <input type="text" id="clientComment" placeholder="Например: есть пожелания по маслу" maxlength="300">
       </div>
 
       <div class="btn-row" style="margin-top:8px;">
@@ -458,7 +475,7 @@
           <span class="review-author">Юля Ф.</span>
           <span class="review-date">12 мая</span>
         </div>
-        <p class="review-text">Долго выбирала студию массажа и читала отзывы — название «Рай» сначала показалось пафосным, но впечатления полностью его оправдали. Сразу порадовала идеальная чистота, а сам массаж подарил полное расслабление — особенно процедуры с кедровой бочкой и скрабом. Дарья оказалась внимательным и тактичным мастером, подробно рассказала о процедурах и помогла выбрать то, что нужно именно ей.</p>
+        <p class="review-text">Долго выбирала студию массажа, читала отзывы — выбор в районе был большой, не хотелось идти наугад. Название «Рай» сначала немного развеселило и показалось пафосным, особенно когда оказалось, что студия находится на цокольном этаже обычного дома. Но впечатления полностью оправдали ожидания: первое, что покорило — идеальная чистота, ни единой зацепки. А сам массаж — расслабление высшего уровня, особенно процедуры с кедровой бочкой и скрабом: кожа после ещё неделю была мягкой, как у младенца. Дашу не стыдно порекомендовать — невероятно тактичный и приятный мастер, подробно рассказала о всех процедурах, ответила на вопросы и помогла подобрать то, что нужно именно мне. Искала серебро, а нашла золото.</p>
       </div>
 
       <div class="review-card">
@@ -466,23 +483,24 @@
           <span class="review-author">Анна Ф.</span>
           <span class="review-date">18 марта</span>
         </div>
-        <p class="review-text">Прошла детокс-программу и осталась под очень приятным впечатлением. Дарья — внимательный мастер, который продумывает каждую деталь: кедровая бочка для расслабления и прогрева, мягкое скрабирование, глубокий массаж и обёртывание с водорослями. Три часа в уютной атмосфере пролетели незаметно, а тело и душа получили полный отдых.</p>
+        <p class="review-text">Порадовала себя детокс-программой в «Рае» и осталась под самым приятным впечатлением. Дарья — потрясающий специалист, мастер своего дела, внимательная и заботливая с первых минут. В программе всё продумано до мелочей: кедровая бочка, в которой тело сразу расслабляется и прогревается, мягкое скрабирование, глубокий массаж, который деликатно проработал самые напряжённые зоны, и обёртывание с водорослями — отдельная любовь. А ещё ароматный травяной чай с угощениями. Три часа пролетели незаметно в уютной, доверительной атмосфере — отдохнули и тело, и душа. Обязательно вернусь и буду рекомендовать подругам.</p>
       </div>
 
       <div class="review-card">
         <div class="review-top">
-          <span class="review-author">Людмила Я.</span>
+          <span class="review-author">Людмила Яровая</span>
           <span class="review-date">8 мая</span>
         </div>
-        <p class="review-text">Осталась в полном восторге от работы мастера. Понравился профессиональный подход: чётко определили зоны напряжения, учли все пожелания и подобрали подходящую технику. Спокойная музыка и приятная атмосфера помогли полностью расслабиться во время процедуры.</p>
+        <p class="review-text">Осталась в полном восторге от работы массажиста. Понравилось абсолютно всё: профессионализм — мастер точно определил зоны напряжения, выслушал все пожелания и подобрал подходящую технику. Атмосфера во время сеанса была очень комфортной — спокойная музыка и приятная обстановка помогли полностью расслабиться. Очень довольна результатом и обязательно вернусь снова.</p>
       </div>
 
-      <a class="reviews-link" href="https://yandex.ru/maps/-/CTURVCKZ" target="_blank" rel="noopener">Смотреть все 55 отзывов на Яндекс Картах →</a>
+      <a class="reviews-link" href="https://yandex.ru/maps/-/CTURVCKZ" target="_blank" rel="noopener">Смотреть все отзывы на Яндекс Картах →</a>
     </div>
 
     <footer>
       ул. Гидростроителей 67<br>
-      8-903-458-55-70
+      8-903-458-55-70<br>
+      <a href="https://instagram.com/ВАШ_ЮЗЕРНЕЙМ" target="_blank" rel="noopener" class="footer-instagram">Instagram →</a>
     </footer>
   </div>
 
@@ -508,8 +526,6 @@ const SERVICE_CATEGORIES = [
       { id: "neck_only", name: "Массаж зоны ШВЗ", duration: 20, price: 1000 },
       { id: "anticellulite", name: "Антицеллюлитный массаж (разовое посещение)", duration: 60, price: 2500 },
       { id: "anticellulite_90", name: "Антицеллюлитный массаж (разовое посещение)", duration: 90, price: 3200 },
-      { id: "figure_60", name: "Коррекция фигуры — комплекс", duration: 60, price: 2200 },
-      { id: "figure_90", name: "Коррекция фигуры — комплекс", duration: 90, price: 2800 },
     ]
   },
   {
@@ -570,7 +586,7 @@ const TELEGRAM_CONFIG = {
   CHAT_ID: '5005567779',
 };
 
-async function notifyMaster(booking){
+async function notifyMaster(booking, eventType){
   const { BOT_TOKEN, CHAT_ID } = TELEGRAM_CONFIG;
 
   if (!BOT_TOKEN || BOT_TOKEN.startsWith('ВСТАВЬТЕ') || !CHAT_ID || CHAT_ID.startsWith('ВСТАВЬТЕ')){
@@ -581,8 +597,18 @@ async function notifyMaster(booking){
   const dateObj = new Date(booking.date + 'T00:00:00');
   const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
 
-  const text =
-`✨ Новая запись — РАЙ
+  const isCancellation = eventType === 'cancelled_by_client';
+
+  const text = isCancellation
+    ? `❌ Клиент отменил запись — РАЙ
+
+💆 ${booking.serviceName}
+📅 ${dateStr}
+🕐 ${booking.start}–${booking.end}
+
+👤 ${booking.clientName}
+📞 ${booking.clientPhone}`
+    : `✨ Новая запись — РАЙ
 
 💆 ${booking.serviceName}
 📅 ${dateStr}
@@ -590,8 +616,7 @@ async function notifyMaster(booking){
 💰 ${booking.servicePrice.toLocaleString('ru-RU')} ₽
 
 👤 ${booking.clientName}
-📞 ${booking.clientPhone}` +
-(booking.comment ? `\n📝 ${booking.comment}` : '');
+📞 ${booking.clientPhone}` + (booking.comment ? `\n📝 ${booking.comment}` : '');
 
   try{
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -653,6 +678,14 @@ const sb = {
       headers: this.headers
     });
     if (!res.ok) throw new Error('supabase-delete-failed: ' + res.status);
+  },
+  async updateWhere(table, query, patch){
+    const res = await fetch(this.url(table, query), {
+      method: 'PATCH',
+      headers: { ...this.headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(patch)
+    });
+    if (!res.ok) throw new Error('supabase-update-failed: ' + res.status);
   }
 };
 
@@ -729,6 +762,14 @@ const Store = {
 
   async deleteBooking(bookingId){
     await sb.deleteWhere('bookings', `id=eq.${bookingId}`);
+  },
+
+  async updateBooking(bookingId, { date, start, end }){
+    await sb.updateWhere('bookings', `id=eq.${bookingId}`, {
+      date: date,
+      start_time: start,
+      end_time: end
+    });
   }
 };
 
@@ -803,6 +844,7 @@ function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
   const bookingsToday = Store.bookings.filter(b => b.date === dateKeyStr);
   const slots = [];
   const STEP = 15;
+  const BUFFER = 15; // минимальный промежуток между соседними записями
 
   intervals.forEach(interval => {
     if (!interval.start || !interval.end) return;
@@ -819,9 +861,11 @@ function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
         if (slotStart <= nowMinutes + 30) continue;
       }
 
+      // A slot conflicts if it falls within BUFFER minutes of any existing booking
+      // on either side — this guarantees a 15-minute gap between consecutive appointments.
       const overlaps = bookingsToday.some(b => {
-        const bStart = timeToMinutes(b.start);
-        const bEnd = timeToMinutes(b.end);
+        const bStart = timeToMinutes(b.start) - BUFFER;
+        const bEnd = timeToMinutes(b.end) + BUFFER;
         return slotStart < bEnd && slotEnd > bStart;
       });
 
@@ -951,9 +995,8 @@ function goToStep(n){
     dot.classList.toggle('done', s < n);
   });
 
-  // Reviews and "cancel by code" link are only relevant on the service-selection step
+  // Reviews are only relevant on the service-selection step; the cancel button stays visible on every step
   document.getElementById('reviewsPanel').classList.toggle('hidden', n !== 1);
-  document.querySelector('.cancel-link-wrap').classList.toggle('hidden', n !== 1);
 
   if (n === 2){
     document.getElementById('step2hint').textContent =
@@ -987,6 +1030,13 @@ async function submitBooking(){
 
   if (!name || !phone){
     alert('Пожалуйста, заполните имя и телефон');
+    return;
+  }
+
+  const digitsOnly = phone.replace(/\D/g, '');
+  // Accept 11 digits (e.g. 79001234567 / 89001234567) — Russian mobile format
+  if (digitsOnly.length !== 11 || !/^[78]/.test(digitsOnly)){
+    alert('Введите корректный номер мобильного телефона, например +7 900 000-00-00');
     return;
   }
 
@@ -1070,6 +1120,7 @@ async function cancelBookingByCode(code, fromConfirmScreen){
   try{
     await withTimeout(Store.deleteBooking(booking.id), 8000);
     Store.bookings.splice(idx, 1);
+    notifyMaster(booking, 'cancelled_by_client'); // fire-and-forget, не блокируем результат для клиента
     return { ok:true, message:`Запись на ${dateStr}, ${booking.start} отменена.`, booking };
   }catch(e){
     return { ok:false, message:'Не удалось отменить запись — проблема с подключением. Попробуйте снова.' };

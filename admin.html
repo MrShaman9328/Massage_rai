@@ -311,21 +311,46 @@
   .booking-service{ font-size:13.5px; margin-bottom:4px; }
   .booking-client{ font-size:13px; color:var(--ink-soft); }
   .booking-comment{ font-size:12.5px; color:var(--ink-soft); font-style:italic; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
-  .cancel-booking-btn{
-    margin-top:10px;
-    width:100%;
+  .booking-actions{ display:flex; gap:8px; margin-top:10px; }
+  .cancel-booking-btn, .edit-booking-btn{
+    flex:1;
     padding:9px;
     border-radius:9px;
     border:1.5px solid var(--line);
     background:transparent;
-    color:var(--rose-deep);
     font-family:'Manrope';
     font-weight:700;
     font-size:12.5px;
     cursor:pointer;
   }
+  .cancel-booking-btn{ color:var(--rose-deep); }
   .cancel-booking-btn:hover{ background:rgba(176,126,126,0.08); }
   .cancel-booking-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .edit-booking-btn{ color:var(--bronze); }
+  .edit-booking-btn:hover{ background:rgba(156,130,102,0.08); }
+
+  .edit-form{
+    margin-top:10px;
+    padding-top:10px;
+    border-top:1px dashed var(--line);
+  }
+  .edit-row{
+    display:flex;
+    gap:8px;
+    margin-bottom:8px;
+  }
+  .edit-row input{
+    flex:1;
+    padding:9px 8px;
+    border-radius:9px;
+    border:1.5px solid var(--line);
+    font-family:'Manrope';
+    font-size:13px;
+    background:var(--bg-soft);
+    color:var(--ink);
+  }
+  .edit-row .btn{ flex:1; }
+  .edit-status{ text-align:center; font-size:12px; min-height:14px; }
 
   .hidden{ display:none !important; }
 
@@ -415,8 +440,6 @@ const SERVICE_CATEGORIES = [
       { id: "neck_only", name: "Массаж зоны ШВЗ", duration: 20, price: 1000 },
       { id: "anticellulite", name: "Антицеллюлитный массаж (разовое посещение)", duration: 60, price: 2500 },
       { id: "anticellulite_90", name: "Антицеллюлитный массаж (разовое посещение)", duration: 90, price: 3200 },
-      { id: "figure_60", name: "Коррекция фигуры — комплекс", duration: 60, price: 2200 },
-      { id: "figure_90", name: "Коррекция фигуры — комплекс", duration: 90, price: 2800 },
     ]
   },
   {
@@ -477,7 +500,7 @@ const TELEGRAM_CONFIG = {
   CHAT_ID: '5005567779',
 };
 
-async function notifyMaster(booking){
+async function notifyMaster(booking, eventType){
   const { BOT_TOKEN, CHAT_ID } = TELEGRAM_CONFIG;
 
   if (!BOT_TOKEN || BOT_TOKEN.startsWith('ВСТАВЬТЕ') || !CHAT_ID || CHAT_ID.startsWith('ВСТАВЬТЕ')){
@@ -488,8 +511,18 @@ async function notifyMaster(booking){
   const dateObj = new Date(booking.date + 'T00:00:00');
   const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
 
-  const text =
-`✨ Новая запись — РАЙ
+  const isCancellation = eventType === 'cancelled_by_client';
+
+  const text = isCancellation
+    ? `❌ Клиент отменил запись — РАЙ
+
+💆 ${booking.serviceName}
+📅 ${dateStr}
+🕐 ${booking.start}–${booking.end}
+
+👤 ${booking.clientName}
+📞 ${booking.clientPhone}`
+    : `✨ Новая запись — РАЙ
 
 💆 ${booking.serviceName}
 📅 ${dateStr}
@@ -497,8 +530,7 @@ async function notifyMaster(booking){
 💰 ${booking.servicePrice.toLocaleString('ru-RU')} ₽
 
 👤 ${booking.clientName}
-📞 ${booking.clientPhone}` +
-(booking.comment ? `\n📝 ${booking.comment}` : '');
+📞 ${booking.clientPhone}` + (booking.comment ? `\n📝 ${booking.comment}` : '');
 
   try{
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -560,6 +592,14 @@ const sb = {
       headers: this.headers
     });
     if (!res.ok) throw new Error('supabase-delete-failed: ' + res.status);
+  },
+  async updateWhere(table, query, patch){
+    const res = await fetch(this.url(table, query), {
+      method: 'PATCH',
+      headers: { ...this.headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify(patch)
+    });
+    if (!res.ok) throw new Error('supabase-update-failed: ' + res.status);
   }
 };
 
@@ -636,6 +676,14 @@ const Store = {
 
   async deleteBooking(bookingId){
     await sb.deleteWhere('bookings', `id=eq.${bookingId}`);
+  },
+
+  async updateBooking(bookingId, { date, start, end }){
+    await sb.updateWhere('bookings', `id=eq.${bookingId}`, {
+      date: date,
+      start_time: start,
+      end_time: end
+    });
   }
 };
 
@@ -906,9 +954,75 @@ function renderBookingsList(){
       <div class="booking-service">${b.serviceName} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
       <div class="booking-client">${b.clientName} · ${b.clientPhone}</div>
       ${b.comment ? `<div class="booking-comment">${b.comment}</div>` : ''}
-      <button class="cancel-booking-btn" data-booking-id="${b.id}">Отменить запись</button>
+      <div class="booking-actions">
+        <button class="edit-booking-btn" data-booking-id="${b.id}">Изменить время</button>
+        <button class="cancel-booking-btn" data-booking-id="${b.id}">Отменить запись</button>
+      </div>
+      <div class="edit-form hidden" data-edit-for="${b.id}">
+        <div class="edit-row">
+          <input type="date" class="edit-date" value="${b.date}">
+          <input type="time" class="edit-time" value="${b.start}">
+        </div>
+        <div class="edit-row">
+          <button class="btn btn-primary edit-save-btn" data-booking-id="${b.id}" style="padding:10px; font-size:13px;">Сохранить</button>
+          <button class="btn btn-ghost edit-cancel-btn" data-booking-id="${b.id}" style="padding:10px; font-size:13px;">Отмена</button>
+        </div>
+        <div class="save-status edit-status" data-status-for="${b.id}"></div>
+      </div>
     `;
     list.appendChild(card);
+  });
+
+  list.querySelectorAll('.edit-booking-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.bookingId;
+      list.querySelector(`.edit-form[data-edit-for="${id}"]`).classList.toggle('hidden');
+    });
+  });
+
+  list.querySelectorAll('.edit-cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.bookingId;
+      list.querySelector(`.edit-form[data-edit-for="${id}"]`).classList.add('hidden');
+    });
+  });
+
+  list.querySelectorAll('.edit-save-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.bookingId;
+      const form = list.querySelector(`.edit-form[data-edit-for="${id}"]`);
+      const status = list.querySelector(`.edit-status[data-status-for="${id}"]`);
+      const newDate = form.querySelector('.edit-date').value;
+      const newStart = form.querySelector('.edit-time').value;
+
+      if (!newDate || !newStart){
+        status.textContent = 'Укажите дату и время';
+        status.style.color = '#B07E7E';
+        return;
+      }
+
+      const booking = Store.bookings.find(b => b.id === id);
+      if (!booking) return;
+
+      const newStartMinutes = timeToMinutes(newStart);
+      const newEnd = minutesToTime(newStartMinutes + booking.serviceDuration);
+
+      btn.disabled = true;
+      btn.textContent = 'Сохраняем...';
+
+      try{
+        await withTimeout(Store.updateBooking(id, { date: newDate, start: newStart, end: newEnd }), 8000);
+        booking.date = newDate;
+        booking.start = newStart;
+        booking.end = newEnd;
+        renderBookingsList();
+      }catch(e){
+        status.textContent = 'Не удалось сохранить — проблема с подключением';
+        status.style.color = '#B07E7E';
+        btn.disabled = false;
+        btn.textContent = 'Сохранить';
+      }
+    });
   });
 
   list.querySelectorAll('.cancel-booking-btn').forEach(btn => {
