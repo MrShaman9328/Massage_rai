@@ -492,56 +492,12 @@ function formatDuration(minutes) {
 }
 
 // ============================================================
-// TELEGRAM-УВЕДОМЛЕНИЯ ДЛЯ МАСТЕРА
+// Примечание: уведомления в Telegram теперь отправляются на стороне
+// Cloud Function (внутри createBooking/deleteBooking), а не из браузера.
+// Это решает проблему блокировки api.telegram.org у части клиентов —
+// сервер не подчиняется тем же сетевым ограничениям, что у конечного
+// пользователя без VPN.
 // ============================================================
-
-const TELEGRAM_CONFIG = {
-  BOT_TOKEN: '8849011621:AAFNa-S1jVaiyZT3FXVW4I-XKadejeeA43I',
-  CHAT_ID: '5005567779',
-};
-
-async function notifyMaster(booking, eventType){
-  const { BOT_TOKEN, CHAT_ID } = TELEGRAM_CONFIG;
-
-  if (!BOT_TOKEN || BOT_TOKEN.startsWith('ВСТАВЬТЕ') || !CHAT_ID || CHAT_ID.startsWith('ВСТАВЬТЕ')){
-    console.warn('Telegram-бот не настроен — уведомление не отправлено.');
-    return;
-  }
-
-  const dateObj = new Date(booking.date + 'T00:00:00');
-  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
-
-  const isCancellation = eventType === 'cancelled_by_client';
-
-  const text = isCancellation
-    ? `❌ Клиент отменил запись — РАЙ
-
-💆 ${booking.serviceName}
-📅 ${dateStr}
-🕐 ${booking.start}–${booking.end}
-
-👤 ${booking.clientName}
-📞 ${booking.clientPhone}`
-    : `✨ Новая запись — РАЙ
-
-💆 ${booking.serviceName}
-📅 ${dateStr}
-🕐 ${booking.start}–${booking.end}
-💰 ${booking.servicePrice.toLocaleString('ru-RU')} ₽
-
-👤 ${booking.clientName}
-📞 ${booking.clientPhone}` + (booking.comment ? `\n📝 ${booking.comment}` : '');
-
-  try{
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: CHAT_ID, text: text })
-    });
-  }catch(e){
-    console.error('Ошибка отправки в Telegram:', e);
-  }
-}
 
 // ============================================================
 // ОБЩИЕ УТИЛИТЫ ДАТЫ/ВРЕМЕНИ
@@ -559,49 +515,22 @@ function minutesToTime(mins){ const h = Math.floor(mins/60); const m = mins%60; 
 // ============================================================
 
 // ============================================================
-// НАСТРОЙКИ SUPABASE
+// НАСТРОЙКИ YANDEX CLOUD FUNCTION (заменяет Supabase)
 // ============================================================
-const SUPABASE_URL = 'https://zjizxpgjhgpjprvmugdg.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_a0F9UlNdtEz7PYNedQmMXA_kfbe9jLo';
+const API_URL = 'https://functions.yandexcloud.net/d4e2n6barn7affiaklbn';
 
-const sb = {
-  headers: {
-    'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
-    'Content-Type': 'application/json',
-  },
-  url(table, query){
-    return `${SUPABASE_URL}/rest/v1/${table}${query ? '?' + query : ''}`;
-  },
-  async select(table, query){
-    const res = await fetch(this.url(table, query), { headers: this.headers });
-    if (!res.ok) throw new Error('supabase-select-failed: ' + res.status);
-    return res.json();
-  },
-  async upsert(table, rows){
-    const res = await fetch(this.url(table), {
-      method: 'POST',
-      headers: { ...this.headers, 'Prefer': 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify(rows)
-    });
-    if (!res.ok) throw new Error('supabase-upsert-failed: ' + res.status);
-  },
-  async deleteWhere(table, query){
-    const res = await fetch(this.url(table, query), {
-      method: 'DELETE',
-      headers: this.headers
-    });
-    if (!res.ok) throw new Error('supabase-delete-failed: ' + res.status);
-  },
-  async updateWhere(table, query, patch){
-    const res = await fetch(this.url(table, query), {
-      method: 'PATCH',
-      headers: { ...this.headers, 'Prefer': 'return=minimal' },
-      body: JSON.stringify(patch)
-    });
-    if (!res.ok) throw new Error('supabase-update-failed: ' + res.status);
+async function callApi(action, extra){
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...extra })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok){
+    throw new Error('api-error: ' + (data.error || res.status));
   }
-};
+  return data;
+}
 
 const Store = {
   schedule: {},
@@ -609,10 +538,8 @@ const Store = {
 
   async loadSchedule(){
     try{
-      const rows = await sb.select('schedule', 'select=date,intervals');
-      const obj = {};
-      rows.forEach(r => { obj[r.date] = r.intervals; });
-      this.schedule = obj;
+      const data = await callApi('getSchedule');
+      this.schedule = data.schedule || {};
     }catch(e){
       console.error('loadSchedule error:', e);
       this.schedule = {};
@@ -621,69 +548,35 @@ const Store = {
 
   async loadBookings(){
     try{
-      const rows = await sb.select('bookings', 'select=*');
-      this.bookings = rows.map(r => ({
-        id: r.id,
-        cancelCode: r.cancel_code,
-        date: r.date,
-        start: r.start_time,
-        end: r.end_time,
-        serviceName: r.service_name,
-        serviceDuration: r.service_duration,
-        servicePrice: r.service_price,
-        clientName: r.client_name,
-        clientPhone: r.client_phone,
-        comment: r.comment || '',
-        createdAt: r.created_at
-      }));
+      const data = await callApi('getBookings');
+      this.bookings = data.bookings || [];
     }catch(e){
       console.error('loadBookings error:', e);
       this.bookings = [];
     }
   },
 
-  // Persist the full in-memory schedule to Supabase: upsert every day that
-  // currently has intervals, and delete any day that was removed locally.
+  // Persist the full in-memory schedule in one call — the function overwrites
+  // schedule.json entirely, so removed days are dropped automatically.
   async saveSchedule(){
-    const days = Object.keys(this.schedule);
-    if (days.length > 0){
-      const rows = days.map(date => ({ date, intervals: this.schedule[date] }));
-      await sb.upsert('schedule', rows);
-    }
-    // Remove days no longer present locally (only within the week being edited
-    // is handled by the caller; here we just sync what's in memory).
+    await callApi('saveSchedule', { schedule: this.schedule });
   },
 
   async deleteScheduleDay(dateKey){
-    await sb.deleteWhere('schedule', `date=eq.${dateKey}`);
+    // Already handled by saveSchedule() overwriting the whole object —
+    // kept as a no-op for compatibility with existing call sites.
   },
 
   async saveNewBooking(booking){
-    await sb.upsert('bookings', [{
-      id: booking.id,
-      cancel_code: booking.cancelCode,
-      date: booking.date,
-      start_time: booking.start,
-      end_time: booking.end,
-      service_name: booking.serviceName,
-      service_duration: booking.serviceDuration,
-      service_price: booking.servicePrice,
-      client_name: booking.clientName,
-      client_phone: booking.clientPhone,
-      comment: booking.comment || null
-    }]);
+    await callApi('createBooking', { booking });
   },
 
-  async deleteBooking(bookingId){
-    await sb.deleteWhere('bookings', `id=eq.${bookingId}`);
+  async deleteBooking(bookingId, options){
+    await callApi('deleteBooking', { bookingId, notifyCancellation: !!(options && options.notifyCancellation) });
   },
 
   async updateBooking(bookingId, { date, start, end }){
-    await sb.updateWhere('bookings', `id=eq.${bookingId}`, {
-      date: date,
-      start_time: start,
-      end_time: end
-    });
+    await callApi('updateBookingTime', { bookingId, date, start, end });
   }
 };
 
@@ -693,6 +586,7 @@ function withTimeout(promise, ms){
 }
 
 // ============================================================
+
 
 
 // ============================================================
@@ -906,10 +800,10 @@ async function saveScheduleHandler(){
   status.textContent = '';
 
   try{
+    // saveSchedule() перезаписывает весь schedule.json целиком, поэтому
+    // удалённые дни (daysToDelete) уже не попадут в сохранённые данные —
+    // отдельного вызова на удаление не требуется.
     await withTimeout(Store.saveSchedule(), 8000);
-    for (const key of daysToDelete){
-      await withTimeout(Store.deleteScheduleDay(key), 8000);
-    }
     status.textContent = '✓ Расписание сохранено';
     setTimeout(()=>{ status.textContent=''; }, 2500);
   }catch(e){
