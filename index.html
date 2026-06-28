@@ -234,6 +234,14 @@
   }
 
   footer{ text-align:center; margin-top:30px; font-size:12px; color:var(--ink-soft); line-height:1.7; }
+
+  .wifi-hint{
+    text-align:center;
+    font-size:11.5px;
+    color:var(--ink-soft);
+    margin-top:10px;
+    line-height:1.5;
+  }
   .footer-instagram{
     display:inline-block;
     margin-top:6px;
@@ -438,6 +446,7 @@
         <button class="btn btn-ghost" id="backTo2">← Назад</button>
         <button class="btn btn-primary" id="submitBooking">Записаться</button>
       </div>
+      <div class="wifi-hint">Если страница не отвечает — попробуйте подключиться к Wi-Fi и повторить запись</div>
     </div>
 
     <div class="panel hidden" id="step4">
@@ -946,6 +955,7 @@ function renderCalendar(){
 function selectDate(key){
   clientState.selectedDate = key;
   clientState.selectedSlot = null;
+  pendingBooking = null; // параметры записи изменились — старая попытка больше не актуальна
   renderCalendar();
   renderSlots();
   document.getElementById('toStep3').disabled = true;
@@ -977,6 +987,7 @@ function renderSlots(){
     if (clientState.selectedSlot === s) el.classList.add('selected');
     el.addEventListener('click', () => {
       clientState.selectedSlot = s;
+      pendingBooking = null; // параметры записи изменились — старая попытка больше не актуальна
       document.querySelectorAll('.slot').forEach(x=>x.classList.remove('selected'));
       el.classList.add('selected');
       document.getElementById('toStep3').disabled = false;
@@ -1023,7 +1034,14 @@ function renderSummary(){
   `;
 }
 
+let pendingBooking = null; // переживает повторные клики на одну и ту же попытку записи
+
 async function submitBooking(){
+  const btn = document.getElementById('submitBooking');
+
+  // Защита от двойного клика: если запрос уже в процессе — игнорируем повторное нажатие
+  if (btn.dataset.submitting === '1') return;
+
   const name = document.getElementById('clientName').value.trim();
   const phone = document.getElementById('clientPhone').value.trim();
   const comment = document.getElementById('clientComment').value.trim();
@@ -1040,43 +1058,56 @@ async function submitBooking(){
     return;
   }
 
-  const svc = clientState.selectedService;
-  const startMinutes = timeToMinutes(clientState.selectedSlot);
-  const endTime = minutesToTime(startMinutes + svc.duration);
+  // Создаём объект записи только один раз — повторные попытки (после сбоя)
+  // переиспользуют тот же id, чтобы upsert не создавал дубликаты.
+  if (!pendingBooking){
+    const svc = clientState.selectedService;
+    const startMinutes = timeToMinutes(clientState.selectedSlot);
+    const endTime = minutesToTime(startMinutes + svc.duration);
 
-  const booking = {
-    id: 'bk_' + Date.now(),
-    cancelCode: generateCancelCode(),
-    date: clientState.selectedDate,
-    start: clientState.selectedSlot,
-    end: endTime,
-    serviceName: svc.name,
-    serviceDuration: svc.duration,
-    servicePrice: svc.price,
-    clientName: name,
-    clientPhone: phone,
-    comment: comment,
-    createdAt: new Date().toISOString()
-  };
+    pendingBooking = {
+      id: 'bk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
+      cancelCode: generateCancelCode(),
+      date: clientState.selectedDate,
+      start: clientState.selectedSlot,
+      end: endTime,
+      serviceName: svc.name,
+      serviceDuration: svc.duration,
+      servicePrice: svc.price,
+      clientName: name,
+      clientPhone: phone,
+      comment: comment,
+      createdAt: new Date().toISOString()
+    };
+  }
 
-  const btn = document.getElementById('submitBooking');
+  const booking = pendingBooking;
+
+  btn.dataset.submitting = '1';
   btn.disabled = true;
   btn.textContent = 'Отправляем...';
 
   try{
-    await withTimeout(Store.saveNewBooking(booking), 8000);
-    Store.bookings.push(booking);
-    await notifyMaster(booking);
+    // Более долгий таймаут — Supabase на бесплатном тарифе может "просыпаться"
+    // после паузы в обращениях, первый запрос иногда занимает дольше обычного.
+    await withTimeout(Store.saveNewBooking(booking), 20000);
+    if (!Store.bookings.some(b => b.id === booking.id)){
+      Store.bookings.push(booking);
+    }
+    pendingBooking = null;
+    notifyMaster(booking); // fire-and-forget — не блокируем подтверждение клиенту
     showConfirmation(booking);
   }catch(e){
     console.error('Booking submission error:', e);
     let msg = 'Не удалось отправить запись. Попробуйте ещё раз.';
     if (e && e.message === 'timeout'){
-      msg = 'Сервер не отвечает. Проверьте соединение и попробуйте снова.';
+      msg = 'Сервер долго не отвечает. Можно попробовать ещё раз — повторное нажатие не создаст вторую запись.';
     } else if (e && String(e.message).includes('supabase')){
       msg = 'Не удалось подключиться к серверу. Проверьте интернет и попробуйте снова.';
     }
     alert(msg);
+    // pendingBooking НЕ сбрасываем — следующая попытка переиспользует тот же id
+    btn.dataset.submitting = '0';
     btn.disabled = false;
     btn.textContent = 'Записаться';
   }
@@ -1131,10 +1162,12 @@ function resetBooking(){
   clientState.selectedService = null;
   clientState.selectedDate = null;
   clientState.selectedSlot = null;
+  pendingBooking = null;
   document.getElementById('clientName').value = '';
   document.getElementById('clientPhone').value = '';
   document.getElementById('clientComment').value = '';
   document.getElementById('submitBooking').disabled = false;
+  document.getElementById('submitBooking').dataset.submitting = '0';
   document.getElementById('submitBooking').textContent = 'Записаться';
   document.querySelectorAll('.service').forEach(el=>el.classList.remove('selected'));
   goToStep(1);
