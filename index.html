@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus&family=Marck+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg: #F4E9E6;
@@ -53,7 +53,7 @@
   /* ---------- Header ---------- */
   header{ text-align:center; padding:18px 0 28px; position:relative; }
   .crest{ width:120px; height:auto; margin:0 auto 12px; display:block; }
-  .brand-name{ font-family:'Marcellus', serif; font-size:34px; letter-spacing:0.18em; margin:0; color:var(--ink); }
+  .brand-name{ font-family:'Marck Script', cursive; font-weight:400; font-size:88px; letter-spacing:0.01em; margin:0; color:var(--ink); }
   .brand-tagline{
     font-family:'Cormorant Garamond', serif;
     font-style:italic;
@@ -238,6 +238,20 @@
   .confirm-details .row{ display:flex; justify-content:space-between; padding:7px 0; font-size:13.5px; border-bottom:1px solid var(--line); }
   .confirm-details .row:last-child{ border-bottom:none; }
 
+  .ladies-only-banner{
+    text-align:center;
+    font-family:'Cormorant Garamond', serif;
+    font-style:italic;
+    font-weight:600;
+    font-size:16px;
+    color:var(--rose-deep);
+    background: rgba(201,154,154,0.28);
+    border:1.5px solid var(--rose-deep);
+    border-radius:12px;
+    padding:11px 16px;
+    margin-bottom:16px;
+  }
+
   .cancel-entry{ text-align:center; margin-bottom:16px; }
   .cancel-entry a{
     display:inline-block;
@@ -375,6 +389,7 @@
   @media (max-width: 380px){
     .intervals-wrap{ padding-left:0; margin-top:10px; }
     .time-input{ width:72px; }
+    .brand-name{ font-size:64px; }
   }
 
   .save-status{ text-align:center; font-size:12.5px; color:var(--good); margin-top:10px; min-height:16px; }
@@ -413,7 +428,7 @@
 
   <header>
     <img class="crest" src="logo-header.png" alt="РАЙ" width="120" height="103">
-    <h1 class="brand-name">РАЙ</h1>
+    <h1 class="brand-name">Рай</h1>
     <div class="brand-tagline">место, куда хочется вернуться</div>
     <div class="brand-sub" id="brandSub">Массажный салон · Онлайн-запись</div>
     <svg class="swoosh" viewBox="0 0 120 14"><path d="M0 7 C 30 -5, 50 18, 80 5 C 95 -1, 105 7, 120 7" stroke="#B07E7E" stroke-width="1.5" fill="none"/></svg>
@@ -421,6 +436,8 @@
 
   <div id="clientView">
   
+
+    <div class="ladies-only-banner">✿ Салон работает только с милыми дамами</div>
 
     <div class="cancel-entry">
       <a id="openCancelLink">Отмена ранее забронированного времени</a>
