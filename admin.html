@@ -1119,6 +1119,17 @@ function setupAdminTabs(){
 // ИСТОРИЯ ПОСЕЩЕНИЙ
 // ============================================================
 
+const MONTH_FULL_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+
+let historyMonthOffset = 0; // 0 = текущий месяц, -1 = предыдущий, и т.д.
+
+function getHistoryMonthKey(offset){
+  const d = new Date();
+  d.setDate(1); // избегаем проблем с разным числом дней в месяцах
+  d.setMonth(d.getMonth() + offset);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
 async function renderHistoryTab(){
   const container = document.getElementById('historyList');
   container.innerHTML = '<div class="empty-state">Загружаем...</div>';
@@ -1127,7 +1138,8 @@ async function renderHistoryTab(){
   try{ history = await Store.getHistory(); }
   catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
 
-  // Записи, которые ждут отметки — время прошло, но статуса ещё нет
+  // Записи, которые ждут отметки — показываем всегда, вне зависимости от
+  // выбранного месяца, так как это требует действия прямо сейчас.
   const nowKey = todayKey();
   const nowTime = new Date().getHours()*60 + new Date().getMinutes();
 
@@ -1140,7 +1152,29 @@ async function renderHistoryTab(){
     return true;
   });
 
+  // Фильтруем историю по выбранному месяцу
+  const monthKey = getHistoryMonthKey(historyMonthOffset);
+  const monthHistory = history.filter(h => h.date.startsWith(monthKey));
+
   container.innerHTML = '';
+
+  // Навигация по месяцам
+  const [y, m] = monthKey.split('-');
+  const monthNav = document.createElement('div');
+  monthNav.className = 'week-nav';
+  monthNav.innerHTML = `
+    <button id="prevHistoryMonth">‹</button>
+    <div class="week-label">${MONTH_FULL_RU[Number(m)-1]} ${y}</div>
+    <button id="nextHistoryMonth" ${historyMonthOffset >= 0 ? 'disabled' : ''}>›</button>
+  `;
+  container.appendChild(monthNav);
+  monthNav.querySelector('#prevHistoryMonth').addEventListener('click', () => {
+    historyMonthOffset--;
+    renderHistoryTab();
+  });
+  monthNav.querySelector('#nextHistoryMonth').addEventListener('click', () => {
+    if (historyMonthOffset < 0){ historyMonthOffset++; renderHistoryTab(); }
+  });
 
   if (waiting.length > 0){
     const section = document.createElement('div');
@@ -1151,17 +1185,18 @@ async function renderHistoryTab(){
     container.appendChild(section);
   }
 
-  if (history.length > 0){
+  if (monthHistory.length > 0){
     const section = document.createElement('div');
-    section.innerHTML = '<div class="history-section-title">📋 История</div>';
-    history.slice().reverse().forEach(h => {
+    section.innerHTML = `<div class="history-section-title">📋 История · ${MONTH_FULL_RU[Number(m)-1]}</div>`;
+    monthHistory.slice().reverse().forEach(h => {
       section.appendChild(buildHistoryCard(h));
     });
     container.appendChild(section);
-  }
-
-  if (waiting.length === 0 && history.length === 0){
-    container.innerHTML = '<div class="empty-state">История пока пуста</div>';
+  } else if (waiting.length === 0){
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.textContent = `За ${MONTH_FULL_RU[Number(m)-1].toLowerCase()} ${y} записей нет`;
+    container.appendChild(empty);
   }
 }
 
