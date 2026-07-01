@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>РАЙ — Массажный салон</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -48,7 +52,7 @@
 
   /* ---------- Header ---------- */
   header{ text-align:center; padding:18px 0 28px; position:relative; }
-  .crest{ width:46px; height:46px; margin:0 auto 14px; opacity:0.85; }
+  .crest{ width:120px; height:auto; margin:0 auto 12px; display:block; }
   .brand-name{ font-family:'Marcellus', serif; font-size:34px; letter-spacing:0.18em; margin:0; color:var(--ink); }
   .brand-tagline{
     font-family:'Cormorant Garamond', serif;
@@ -408,10 +412,7 @@
 <div class="wrap">
 
   <header>
-    <svg class="crest" viewBox="0 0 100 100" fill="none">
-      <path d="M50 15 C 35 25, 20 45, 50 90 C 80 45, 65 25, 50 15 Z" stroke="#B07E7E" stroke-width="2.5"/>
-      <circle cx="50" cy="40" r="6" fill="#C99A9A"/>
-    </svg>
+    <img class="crest" src="logo-header.png" alt="РАЙ" width="120" height="103">
     <h1 class="brand-name">РАЙ</h1>
     <div class="brand-tagline">место, куда хочется вернуться</div>
     <div class="brand-sub" id="brandSub">Массажный салон · Онлайн-запись</div>
@@ -1137,6 +1138,21 @@ async function submitBooking(){
     showConfirmation(booking);
   }catch(e){
     console.error('Booking submission error:', e);
+
+    // Особый случай: пока клиент оформлял запись, это время заняли —
+    // сервер отклонил попытку. Нужно вернуть к выбору времени с актуальными данными.
+    if (e && String(e.message).includes('slot-taken')){
+      alert('Это время только что заняли. Пожалуйста, выберите другое.');
+      pendingBooking = null;
+      clientState.selectedSlot = null;
+      btn.dataset.submitting = '0';
+      btn.disabled = false;
+      btn.textContent = 'Записаться';
+      try{ await Store.loadBookings(); }catch(err){ /* покажем что есть */ }
+      goToStep(2);
+      return;
+    }
+
     let msg = 'Не удалось отправить запись. Попробуйте ещё раз.';
     if (e && e.message === 'timeout'){
       msg = 'Сервер долго не отвечает. Можно попробовать ещё раз — повторное нажатие не создаст вторую запись.';
