@@ -311,6 +311,7 @@
   .booking-service{ font-size:13.5px; margin-bottom:4px; }
   .booking-client{ font-size:13px; color:var(--ink-soft); }
   .booking-comment{ font-size:12.5px; color:var(--ink-soft); font-style:italic; margin-top:6px; padding-top:6px; border-top:1px solid var(--line); }
+  .booking-comment.client-note{ color:var(--bronze); border-top:1px dashed var(--line); }
   .booking-actions{ display:flex; gap:8px; margin-top:10px; }
   .cancel-booking-btn, .edit-booking-btn{
     flex:1;
@@ -354,6 +355,93 @@
 
   .hidden{ display:none !important; }
 
+  /* --- Вкладок теперь 5 — уменьшаем шрифт чуть-чуть --- */
+  .tab{ font-size:12px; padding:9px 6px; }
+
+  /* --- История --- */
+  .history-section-title{
+    font-family:'Marcellus', serif;
+    font-size:15px;
+    color:var(--bronze);
+    margin:18px 0 10px;
+    padding-bottom:6px;
+    border-bottom:1px solid var(--line);
+  }
+  .waiting-card{ border-color:var(--rose); }
+  .mark-actions{ display:flex; gap:8px; margin-top:10px; }
+  .mark-btn{
+    flex:1; padding:9px; border-radius:9px; border:1.5px solid var(--line);
+    background:transparent; font-family:'Manrope'; font-weight:700;
+    font-size:12.5px; cursor:pointer;
+  }
+  .mark-completed{ color:var(--good); border-color:var(--good); }
+  .mark-completed:hover{ background:rgba(110,156,124,0.1); }
+  .mark-noshow{ color:var(--rose-deep); }
+  .mark-noshow:hover{ background:rgba(176,126,126,0.08); }
+  .status-badge{
+    display:inline-block; margin-top:8px;
+    padding:3px 10px; border-radius:20px;
+    font-size:11.5px; font-weight:700;
+  }
+  .status-done{ background:rgba(110,156,124,0.15); color:var(--good); }
+  .status-noshow{ background:rgba(176,126,126,0.12); color:var(--rose-deep); }
+
+  /* --- Клиенты --- */
+  .client-stats{
+    display:flex; flex-wrap:wrap; gap:12px;
+    font-size:12.5px; color:var(--ink-soft);
+    margin:6px 0 10px;
+  }
+  .client-stats b{ color:var(--ink); }
+  .client-badge{
+    display:inline-block; margin-right:4px;
+    padding:2px 8px; border-radius:20px; font-size:11px; font-weight:700;
+  }
+  .badge-new{ background:rgba(156,130,102,0.15); color:var(--bronze); }
+  .badge-regular{ background:rgba(110,156,124,0.15); color:var(--good); }
+  .badge-sleeping{ background:rgba(176,126,126,0.12); color:var(--rose-deep); }
+  .notes-block{ margin-top:8px; }
+  .notes-input{
+    width:100%; padding:10px 12px; border-radius:10px;
+    border:1.5px solid var(--line); background:var(--bg-soft);
+    font-family:'Manrope'; font-size:13px; color:var(--ink);
+    resize:vertical; min-height:60px;
+  }
+  .notes-input:focus{ outline:none; border-color:var(--rose-deep); }
+  .save-note-btn{
+    margin-top:6px; padding:8px 16px; border-radius:9px;
+    border:1.5px solid var(--line); background:transparent;
+    font-family:'Manrope'; font-weight:700; font-size:12px;
+    color:var(--bronze); cursor:pointer;
+  }
+  .save-note-btn:hover{ color:var(--rose-deep); border-color:var(--rose-deep); }
+
+  /* --- Аналитика --- */
+  .analytics-summary{
+    display:grid; grid-template-columns:1fr 1fr;
+    gap:10px; margin-bottom:6px;
+  }
+  .analytics-card{
+    background:var(--bg-soft); border-radius:14px;
+    padding:14px 16px; text-align:center;
+    border:1.5px solid var(--line);
+  }
+  .analytics-card-wide{ grid-column:1/-1; }
+  .analytics-num{
+    font-family:'Marcellus', serif; font-size:22px;
+    color:var(--rose-deep); margin-bottom:4px;
+  }
+  .analytics-label{ font-size:11.5px; color:var(--ink-soft); }
+  .monthly-row{
+    display:flex; justify-content:space-between; align-items:center;
+    padding:10px 0; border-bottom:1px solid var(--line);
+    flex-wrap:wrap; gap:6px;
+  }
+  .monthly-row:last-child{ border-bottom:none; }
+  .monthly-label{ font-family:'Marcellus', serif; font-size:14px; min-width:90px; }
+  .monthly-stats{ display:flex; gap:14px; font-size:12.5px; color:var(--ink-soft); flex-wrap:wrap; }
+  .monthly-stats span b{ color:var(--ink); }
+
   @media (prefers-reduced-motion: reduce){ .panel{ animation:none; } }
 </style>
 </head>
@@ -389,6 +477,9 @@
     <div class="tabs">
       <div class="tab active" data-tab="schedule">Расписание</div>
       <div class="tab" data-tab="bookings">Записи</div>
+      <div class="tab" data-tab="history">История</div>
+      <div class="tab" data-tab="clients">Клиенты</div>
+      <div class="tab" data-tab="analytics">Аналитика</div>
     </div>
 
     <div id="scheduleTab">
@@ -414,6 +505,30 @@
         <h2>Предстоящие записи</h2>
         <p class="hint">Все записи клиентов, начиная с сегодняшнего дня</p>
         <div id="bookingsList"></div>
+      </div>
+    </div>
+
+    <div id="historyTab" class="hidden">
+      <div class="panel">
+        <h2>История посещений</h2>
+        <p class="hint">Отметьте кто пришёл/не пришёл — записи попадут в статистику</p>
+        <div id="historyList"></div>
+      </div>
+    </div>
+
+    <div id="clientsTab" class="hidden">
+      <div class="panel">
+        <h2>База клиентов</h2>
+        <p class="hint">Заполняется автоматически после каждого выполненного визита</p>
+        <div id="clientsList"></div>
+      </div>
+    </div>
+
+    <div id="analyticsTab" class="hidden">
+      <div class="panel">
+        <h2>Аналитика</h2>
+        <p class="hint">Сводная статистика по выполненным визитам</p>
+        <div id="analyticsList"></div>
       </div>
     </div>
   </div>
@@ -577,6 +692,39 @@ const Store = {
 
   async updateBooking(bookingId, { date, start, end }){
     await callApi('updateBookingTime', { bookingId, date, start, end });
+  },
+
+  async markBooking(bookingId, status){
+    await callApi('markBooking', { bookingId, status });
+  },
+
+  async getHistory(){
+    const data = await callApi('getHistory');
+    return data.history || [];
+  },
+
+  async getClients(){
+    const data = await callApi('getClients');
+    return data.clients || {};
+  },
+
+  async saveClientNote(phone, notes){
+    await callApi('saveClientNote', { phone, notes });
+  },
+
+  async exportHistoryCsv(){
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'exportHistory' })
+    });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'rai-history.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 };
 
@@ -847,7 +995,8 @@ function renderBookingsList(){
       </div>
       <div class="booking-service">${b.serviceName} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
       <div class="booking-client">${b.clientName} · ${b.clientPhone}</div>
-      ${b.comment ? `<div class="booking-comment">${b.comment}</div>` : ''}
+      ${b.comment ? `<div class="booking-comment">💬 ${b.comment}</div>` : ''}
+      ${b.clientNotes ? `<div class="booking-comment client-note">📌 ${b.clientNotes}</div>` : ''}
       <div class="booking-actions">
         <button class="edit-booking-btn" data-booking-id="${b.id}">Изменить время</button>
         <button class="cancel-booking-btn" data-booking-id="${b.id}">Отменить запись</button>
@@ -950,10 +1099,290 @@ function setupAdminTabs(){
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
       const target = tab.dataset.tab;
-      document.getElementById('scheduleTab').classList.toggle('hidden', target !== 'schedule');
-      document.getElementById('bookingsTab').classList.toggle('hidden', target !== 'bookings');
+      ['scheduleTab','bookingsTab','historyTab','clientsTab','analyticsTab'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      const activeEl = document.getElementById(target + 'Tab');
+      if (activeEl) activeEl.classList.remove('hidden');
+
       if (target === 'bookings') renderBookingsList();
+      if (target === 'history')  renderHistoryTab();
+      if (target === 'clients')  renderClientsTab();
+      if (target === 'analytics') renderAnalyticsTab();
     });
+  });
+}
+
+// ============================================================
+// ИСТОРИЯ ПОСЕЩЕНИЙ
+// ============================================================
+
+async function renderHistoryTab(){
+  const container = document.getElementById('historyList');
+  container.innerHTML = '<div class="empty-state">Загружаем...</div>';
+
+  let history = [];
+  try{ history = await Store.getHistory(); }
+  catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+
+  // Записи, которые ждут отметки — время прошло, но статуса ещё нет
+  const nowKey = todayKey();
+  const nowTime = new Date().getHours()*60 + new Date().getMinutes();
+
+  const waiting = Store.bookings.filter(b => {
+    if (b.date > nowKey) return false;
+    if (b.date === nowKey){
+      const endMins = timeToMinutes(b.end);
+      return endMins <= nowTime;
+    }
+    return true;
+  });
+
+  container.innerHTML = '';
+
+  if (waiting.length > 0){
+    const section = document.createElement('div');
+    section.innerHTML = '<div class="history-section-title">⏳ Ждут отметки</div>';
+    waiting.sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start)).forEach(b => {
+      section.appendChild(buildWaitingCard(b));
+    });
+    container.appendChild(section);
+  }
+
+  if (history.length > 0){
+    const section = document.createElement('div');
+    section.innerHTML = '<div class="history-section-title">📋 История</div>';
+    history.slice().reverse().forEach(h => {
+      section.appendChild(buildHistoryCard(h));
+    });
+    container.appendChild(section);
+  }
+
+  if (waiting.length === 0 && history.length === 0){
+    container.innerHTML = '<div class="empty-state">История пока пуста</div>';
+  }
+}
+
+function buildWaitingCard(b){
+  const d = new Date(b.date + 'T00:00:00');
+  const dateStr = d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
+  const card = document.createElement('div');
+  card.className = 'booking-card waiting-card';
+  card.innerHTML = `
+    <div class="booking-top">
+      <span class="booking-date">${dateStr}</span>
+      <span class="booking-time">${b.start}–${b.end}</span>
+    </div>
+    <div class="booking-service">${b.serviceName} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
+    <div class="booking-client">${b.clientName} · ${b.clientPhone}</div>
+    <div class="mark-actions">
+      <button class="mark-btn mark-completed" data-id="${b.id}">✅ Пришёл</button>
+      <button class="mark-btn mark-noshow" data-id="${b.id}">❌ Не пришёл</button>
+    </div>
+  `;
+  card.querySelector('.mark-completed').addEventListener('click', () => markBooking(b.id, 'completed', card));
+  card.querySelector('.mark-noshow').addEventListener('click', () => markBooking(b.id, 'no_show', card));
+  return card;
+}
+
+function buildHistoryCard(h){
+  const d = new Date(h.date + 'T00:00:00');
+  const dateStr = d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
+  const card = document.createElement('div');
+  card.className = 'booking-card history-card';
+  const statusBadge = h.status === 'completed'
+    ? '<span class="status-badge status-done">✅ Выполнено</span>'
+    : '<span class="status-badge status-noshow">❌ Не пришёл</span>';
+  card.innerHTML = `
+    <div class="booking-top">
+      <span class="booking-date">${dateStr}</span>
+      <span class="booking-time">${h.start}–${h.end}</span>
+    </div>
+    <div class="booking-service">${h.serviceName} · ${h.servicePrice.toLocaleString('ru-RU')} ₽</div>
+    <div class="booking-client">${h.clientName} · ${h.clientPhone}</div>
+    ${statusBadge}
+  `;
+  return card;
+}
+
+async function markBooking(bookingId, status, card){
+  const btns = card.querySelectorAll('.mark-btn');
+  btns.forEach(b => b.disabled = true);
+  try{
+    await withTimeout(Store.markBooking(bookingId, status), 10000);
+    // обновить список записей в памяти
+    const idx = Store.bookings.findIndex(b => b.id === bookingId);
+    if (idx !== -1) Store.bookings.splice(idx, 1);
+    renderHistoryTab();
+  }catch(e){
+    alert('Не удалось сохранить отметку. Попробуйте снова.');
+    btns.forEach(b => b.disabled = false);
+  }
+}
+
+// ============================================================
+// БАЗА КЛИЕНТОВ
+// ============================================================
+
+async function renderClientsTab(){
+  const container = document.getElementById('clientsList');
+  container.innerHTML = '<div class="empty-state">Загружаем...</div>';
+
+  let clients = {};
+  try{ clients = await Store.getClients(); }
+  catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+
+  const list = Object.values(clients);
+  if (list.length === 0){
+    container.innerHTML = '<div class="empty-state">База клиентов пуста — она заполняется после первого выполненного визита</div>';
+    return;
+  }
+
+  // Сортируем по дате последнего визита (новые сверху)
+  list.sort((a,b) => (b.lastVisit||'').localeCompare(a.lastVisit||''));
+
+  const today = todayKey();
+  container.innerHTML = '';
+  list.forEach(client => {
+    const daysSince = Math.floor((new Date(today) - new Date(client.lastVisit + 'T00:00:00')) / 86400000);
+    let statusLabel = '';
+    if (client.visits >= 3) statusLabel = '<span class="client-badge badge-regular">Постоянный</span>';
+    else if (client.visits === 1) statusLabel = '<span class="client-badge badge-new">Новый</span>';
+    if (daysSince > 30) statusLabel += '<span class="client-badge badge-sleeping">Давно не был</span>';
+
+    const card = document.createElement('div');
+    card.className = 'booking-card client-card';
+    card.innerHTML = `
+      <div class="booking-top">
+        <span class="booking-date">${client.name}</span>
+        <span>${statusLabel}</span>
+      </div>
+      <div class="booking-client">${client.phone}</div>
+      <div class="client-stats">
+        <span>Визитов: <b>${client.visits}</b></span>
+        <span>Потрачено: <b>${(client.totalSpent||0).toLocaleString('ru-RU')} ₽</b></span>
+        <span>Последний: <b>${client.lastVisit || '—'}</b></span>
+      </div>
+      <div class="notes-block">
+        <textarea class="notes-input" placeholder="Заметки (особенности, предпочтения...)" data-phone="${client.phone}">${client.notes||''}</textarea>
+        <button class="save-note-btn" data-phone="${client.phone}">Сохранить заметку</button>
+        <div class="save-status note-status" data-note-status="${client.phone}"></div>
+      </div>
+    `;
+    card.querySelector('.save-note-btn').addEventListener('click', async (e) => {
+      const phone = e.target.dataset.phone;
+      const notes = card.querySelector(`.notes-input[data-phone="${phone}"]`).value;
+      const status = card.querySelector(`[data-note-status="${phone}"]`);
+      e.target.disabled = true;
+      try{
+        await withTimeout(Store.saveClientNote(phone, notes), 8000);
+        status.textContent = '✓ Сохранено';
+        status.style.color = 'var(--good)';
+        setTimeout(()=>{ status.textContent=''; }, 2000);
+      }catch(err){
+        status.textContent = 'Ошибка сохранения';
+        status.style.color = '#B07E7E';
+      }
+      e.target.disabled = false;
+    });
+    container.appendChild(card);
+  });
+}
+
+// ============================================================
+// АНАЛИТИКА
+// ============================================================
+
+async function renderAnalyticsTab(){
+  const container = document.getElementById('analyticsList');
+  container.innerHTML = '<div class="empty-state">Загружаем...</div>';
+
+  let history = [];
+  try{ history = await Store.getHistory(); }
+  catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+
+  const completed = history.filter(h => h.status === 'completed');
+  const noshow    = history.filter(h => h.status === 'no_show');
+
+  // Считаем по месяцам
+  const byMonth = {};
+  completed.forEach(h => {
+    const month = h.date.slice(0,7); // YYYY-MM
+    if (!byMonth[month]) byMonth[month] = { visits:0, revenue:0, minutes:0 };
+    byMonth[month].visits++;
+    byMonth[month].revenue += h.servicePrice || 0;
+    byMonth[month].minutes += h.serviceDuration || 0;
+  });
+
+  const totalRevenue = completed.reduce((s,h)=>s+(h.servicePrice||0), 0);
+  const totalMinutes = completed.reduce((s,h)=>s+(h.serviceDuration||0), 0);
+  const uniqueClients = new Set(completed.map(h => h.clientPhone.replace(/\D/g,''))).size;
+
+  const months = Object.keys(byMonth).sort().reverse();
+  const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
+
+  container.innerHTML = `
+    <div class="analytics-summary">
+      <div class="analytics-card">
+        <div class="analytics-num">${completed.length}</div>
+        <div class="analytics-label">Выполнено визитов</div>
+      </div>
+      <div class="analytics-card">
+        <div class="analytics-num">${noshow.length}</div>
+        <div class="analytics-label">Не пришли</div>
+      </div>
+      <div class="analytics-card">
+        <div class="analytics-num">${uniqueClients}</div>
+        <div class="analytics-label">Уникальных клиентов</div>
+      </div>
+      <div class="analytics-card">
+        <div class="analytics-num">${Math.floor(totalMinutes/60)} ч ${totalMinutes%60} мин</div>
+        <div class="analytics-label">Всего рабочего времени</div>
+      </div>
+      <div class="analytics-card analytics-card-wide">
+        <div class="analytics-num">${totalRevenue.toLocaleString('ru-RU')} ₽</div>
+        <div class="analytics-label">Всего заработано</div>
+      </div>
+    </div>
+
+    <div class="history-section-title" style="margin-top:20px;">По месяцам</div>
+    <div id="monthlyTable"></div>
+
+    <button class="btn btn-primary" id="exportCsvBtn" style="margin-top:18px;">
+      📥 Скачать историю (CSV для Excel)
+    </button>
+  `;
+
+  const table = document.getElementById('monthlyTable');
+  if (months.length === 0){
+    table.innerHTML = '<div class="empty-state">Пока нет данных</div>';
+  } else {
+    months.forEach(m => {
+      const [y, mo] = m.split('-');
+      const label = `${MONTH_NAMES[Number(mo)-1]} ${y}`;
+      const row = document.createElement('div');
+      row.className = 'monthly-row';
+      row.innerHTML = `
+        <div class="monthly-label">${label}</div>
+        <div class="monthly-stats">
+          <span>${byMonth[m].visits} визитов</span>
+          <span>${Math.floor(byMonth[m].minutes/60)} ч ${byMonth[m].minutes%60} мин</span>
+          <span>${byMonth[m].revenue.toLocaleString('ru-RU')} ₽</span>
+        </div>
+      `;
+      table.appendChild(row);
+    });
+  }
+
+  document.getElementById('exportCsvBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('exportCsvBtn');
+    btn.disabled = true;
+    btn.textContent = 'Формируем файл...';
+    try{ await Store.exportHistoryCsv(); }
+    catch(e){ alert('Не удалось скачать файл'); }
+    btn.disabled = false;
+    btn.textContent = '📥 Скачать историю (CSV для Excel)';
   });
 }
 
