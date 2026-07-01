@@ -123,11 +123,57 @@
   .service{
     display:flex; justify-content:space-between; align-items:center; gap:14px;
     padding:14px 16px; border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px;
-    cursor:pointer; transition: border-color .2s, background .2s, transform .15s; background:var(--bg-soft);
+    cursor:pointer; transition: border-color .2s, background .2s, transform .15s, box-shadow .2s, padding-left .2s; background:var(--bg-soft);
+    position:relative;
   }
   .service:hover{ border-color:var(--rose); }
   .service:active{ transform:scale(0.985); }
-  .service.selected{ border-color:var(--rose-deep); background: rgba(201,154,154,0.12); }
+  .service.selected{
+    border-color:var(--rose-deep);
+    border-width:2px;
+    background: rgba(201,154,154,0.22);
+    box-shadow: 0 4px 14px -6px rgba(176,126,126,0.45);
+    padding-left:44px;
+  }
+  .service.selected .service-name{ color:var(--rose-deep); font-weight:700; }
+  .service.selected::before{
+    content:"✓";
+    position:absolute;
+    left:14px;
+    top:50%;
+    transform:translateY(-50%);
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--rose-deep);
+    color:#fff;
+    font-size:13px;
+    font-weight:700;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .services-footer{
+    position:sticky;
+    bottom:0;
+    margin-top:18px;
+    padding:14px 16px;
+    background:var(--card);
+    border-radius:16px;
+    border:1.5px solid var(--rose-deep);
+    box-shadow: 0 -8px 24px -12px rgba(58,44,41,0.25);
+  }
+  .services-footer-summary{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:13.5px;
+    margin-bottom:10px;
+    color:var(--ink);
+  }
+  .selected-total-price{
+    font-family:'Marcellus', serif;
+    font-size:17px;
+    color:var(--rose-deep);
+  }
   .service-name{ font-size:14.5px; font-weight:600; line-height:1.35; }
   .service-meta{ font-size:12px; color:var(--ink-soft); margin-top:2px; }
   .service-price{ font-family:'Marcellus', serif; font-size:16px; white-space:nowrap; color:var(--rose-deep); }
@@ -396,9 +442,13 @@
     </div>
 
     <div class="panel" id="step1">
-      <h2>Выберите услугу</h2>
-      <p class="hint">Нажмите на процедуру, чтобы продолжить</p>
+      <h2>Выберите услуги</h2>
+      <p class="hint">Можно выбрать до 3 услуг за одно посещение — нажмите на нужные</p>
       <div id="servicesList"></div>
+      <div class="services-footer hidden" id="servicesFooter">
+        <div class="services-footer-summary" id="selectedServicesSummary"></div>
+        <button class="btn btn-primary" id="toStep2" disabled>Продолжить</button>
+      </div>
     </div>
 
     <div class="panel hidden" id="step2">
@@ -724,13 +774,32 @@ function withTimeout(promise, ms){
 const DOW_LABELS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
 const MONTH_LABELS = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
+const MAX_SELECTED_SERVICES = 3;
+
 const clientState = {
-  selectedService: null,
+  selectedServiceIds: [], // массив id выбранных услуг, порядок = порядок выбора
   calendarMonth: new Date().getMonth(),
   calendarYear: new Date().getFullYear(),
   selectedDate: null,
   selectedSlot: null,
 };
+
+// Возвращает выбранные услуги как массив объектов (в порядке выбора)
+function getSelectedServices(){
+  return clientState.selectedServiceIds.map(id => getServiceById(id)).filter(Boolean);
+}
+
+function getSelectedTotalDuration(){
+  return getSelectedServices().reduce((sum, s) => sum + s.duration, 0);
+}
+
+function getSelectedTotalPrice(){
+  return getSelectedServices().reduce((sum, s) => sum + s.price, 0);
+}
+
+function getSelectedCombinedName(){
+  return getSelectedServices().map(s => s.name).join(', ');
+}
 
 function renderServices(){
   const container = document.getElementById('servicesList');
@@ -759,18 +828,53 @@ function renderServices(){
         </div>
         <div class="service-price">${svc.price.toLocaleString('ru-RU')} ₽</div>
       `;
-      el.addEventListener('click', () => selectService(svc.id));
+      el.addEventListener('click', () => toggleService(svc.id));
       container.appendChild(el);
     });
   });
+  updateServicesFooter();
 }
 
-function selectService(id){
-  clientState.selectedService = getServiceById(id);
+function toggleService(id){
+  const idx = clientState.selectedServiceIds.indexOf(id);
+  if (idx !== -1){
+    // уже выбрана — снимаем выбор
+    clientState.selectedServiceIds.splice(idx, 1);
+  } else {
+    if (clientState.selectedServiceIds.length >= MAX_SELECTED_SERVICES){
+      alert(`Можно выбрать не более ${MAX_SELECTED_SERVICES} услуг за одно посещение`);
+      return;
+    }
+    clientState.selectedServiceIds.push(id);
+  }
+
   document.querySelectorAll('.service').forEach(el=>{
-    el.classList.toggle('selected', el.dataset.id === id);
+    el.classList.toggle('selected', clientState.selectedServiceIds.includes(el.dataset.id));
   });
-  setTimeout(() => goToStep(2), 180);
+
+  updateServicesFooter();
+}
+
+function updateServicesFooter(){
+  const footer = document.getElementById('servicesFooter');
+  const btn = document.getElementById('toStep2');
+  const count = clientState.selectedServiceIds.length;
+
+  if (count === 0){
+    footer.classList.add('hidden');
+    return;
+  }
+
+  footer.classList.remove('hidden');
+  const services = getSelectedServices();
+  const totalDuration = getSelectedTotalDuration();
+  const totalPrice = getSelectedTotalPrice();
+
+  document.getElementById('selectedServicesSummary').innerHTML = `
+    <span>${count === 1 ? 'Выбрана 1 услуга' : `Выбрано услуг: ${count}`} · ${formatDuration(totalDuration)}</span>
+    <span class="selected-total-price">${totalPrice.toLocaleString('ru-RU')} ₽</span>
+  `;
+  btn.disabled = false;
 }
 
 function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
@@ -814,10 +918,10 @@ function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
 }
 
 function dateHasAnySlots(dateKeyStr){
-  if (!clientState.selectedService) return false;
+  if (clientState.selectedServiceIds.length === 0) return false;
   const intervals = Store.schedule[dateKeyStr];
   if (!intervals || !Array.isArray(intervals) || intervals.length === 0) return false;
-  return getAvailableSlotsForDate(dateKeyStr, clientState.selectedService.duration).length > 0;
+  return getAvailableSlotsForDate(dateKeyStr, getSelectedTotalDuration()).length > 0;
 }
 
 function renderCalendar(){
@@ -898,7 +1002,7 @@ function renderSlots(){
     return;
   }
 
-  const slots = getAvailableSlotsForDate(clientState.selectedDate, clientState.selectedService.duration);
+  const slots = getAvailableSlotsForDate(clientState.selectedDate, getSelectedTotalDuration());
 
   if (slots.length === 0){
     section.classList.remove('hidden');
@@ -938,7 +1042,7 @@ function goToStep(n){
 
   if (n === 2){
     document.getElementById('step2hint').textContent =
-      `${clientState.selectedService.name} · ${formatDuration(clientState.selectedService.duration)}`;
+      `${getSelectedCombinedName()} · ${formatDuration(getSelectedTotalDuration())}`;
     renderCalendar();
     renderSlots();
   }
@@ -949,15 +1053,19 @@ function goToStep(n){
 }
 
 function renderSummary(){
-  const svc = clientState.selectedService;
+  const services = getSelectedServices();
   const dateObj = new Date(clientState.selectedDate + 'T00:00:00');
   const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
 
+  const servicesRows = services.map(s => `
+    <div class="summary-row"><span class="label">${s.name}</span><span>${s.price.toLocaleString('ru-RU')} ₽</span></div>
+  `).join('');
+
   document.getElementById('bookingSummary').innerHTML = `
-    <div class="summary-row"><span class="label">Услуга</span><span>${svc.name}</span></div>
+    ${servicesRows}
     <div class="summary-row"><span class="label">Дата</span><span>${dateStr}</span></div>
     <div class="summary-row"><span class="label">Время</span><span>${clientState.selectedSlot}</span></div>
-    <div class="summary-row total"><span class="label">К оплате</span><span>${svc.price.toLocaleString('ru-RU')} ₽</span></div>
+    <div class="summary-row total"><span class="label">К оплате</span><span>${getSelectedTotalPrice().toLocaleString('ru-RU')} ₽</span></div>
   `;
 }
 
@@ -988,9 +1096,11 @@ async function submitBooking(){
   // Создаём объект записи только один раз — повторные попытки (после сбоя)
   // переиспользуют тот же id, чтобы upsert не создавал дубликаты.
   if (!pendingBooking){
-    const svc = clientState.selectedService;
+    const services = getSelectedServices();
+    const totalDuration = getSelectedTotalDuration();
+    const totalPrice = getSelectedTotalPrice();
     const startMinutes = timeToMinutes(clientState.selectedSlot);
-    const endTime = minutesToTime(startMinutes + svc.duration);
+    const endTime = minutesToTime(startMinutes + totalDuration);
 
     pendingBooking = {
       id: 'bk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -998,9 +1108,9 @@ async function submitBooking(){
       date: clientState.selectedDate,
       start: clientState.selectedSlot,
       end: endTime,
-      serviceName: svc.name,
-      serviceDuration: svc.duration,
-      servicePrice: svc.price,
+      serviceName: services.map(s => s.name).join(', '),
+      serviceDuration: totalDuration,
+      servicePrice: totalPrice,
       clientName: name,
       clientPhone: phone,
       comment: comment,
@@ -1088,7 +1198,7 @@ async function cancelBookingByCode(code, fromConfirmScreen){
 }
 
 function resetBooking(){
-  clientState.selectedService = null;
+  clientState.selectedServiceIds = [];
   clientState.selectedDate = null;
   clientState.selectedSlot = null;
   pendingBooking = null;
@@ -1099,6 +1209,7 @@ function resetBooking(){
   document.getElementById('submitBooking').dataset.submitting = '0';
   document.getElementById('submitBooking').textContent = 'Записаться';
   document.querySelectorAll('.service').forEach(el=>el.classList.remove('selected'));
+  updateServicesFooter();
   goToStep(1);
 }
 
@@ -1169,6 +1280,7 @@ async function init(){
     renderSlots();
   });
   document.getElementById('backTo1').addEventListener('click', () => goToStep(1));
+  document.getElementById('toStep2').addEventListener('click', () => goToStep(2));
   document.getElementById('toStep3').addEventListener('click', () => goToStep(3));
   document.getElementById('backTo2').addEventListener('click', () => goToStep(2));
   document.getElementById('submitBooking').addEventListener('click', submitBooking);
