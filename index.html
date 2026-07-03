@@ -166,22 +166,26 @@
 
   /* ---------- Service cards ---------- */
   .service{
-    display:flex; justify-content:space-between; align-items:center; gap:14px;
-    padding:14px 16px; border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px;
-    cursor:pointer; transition: border-color .2s, background .2s, transform .15s, box-shadow .2s, padding-left .2s; background:var(--bg-soft);
-    position:relative;
+    border:1.5px solid var(--line); border-radius:14px; margin-bottom:8px;
+    transition: border-color .2s, background .2s, box-shadow .2s; background:var(--bg-soft);
+    overflow:hidden;
   }
   .service:hover{ border-color:var(--rose); }
-  .service:active{ transform:scale(0.985); }
+  .service-row{
+    display:flex; justify-content:space-between; align-items:center; gap:14px;
+    padding:14px 16px; cursor:pointer; position:relative;
+    transition: padding-left .2s;
+  }
+  .service:active .service-row{ transform:scale(0.985); }
   .service.selected{
     border-color:var(--rose-deep);
     border-width:2px;
     background: rgba(201,154,154,0.22);
     box-shadow: 0 4px 14px -6px rgba(176,126,126,0.45);
-    padding-left:44px;
   }
+  .service.selected .service-row{ padding-left:44px; }
   .service.selected .service-name{ color:var(--rose-deep); font-weight:700; }
-  .service.selected::before{
+  .service.selected .service-row::before{
     content:"✓";
     position:absolute;
     left:14px;
@@ -195,6 +199,29 @@
     font-weight:700;
     display:flex; align-items:center; justify-content:center;
   }
+
+  .spa-toggle{
+    display:flex; align-items:center; gap:5px;
+    margin:0 16px 12px; padding:0;
+    background:none; border:none; cursor:pointer;
+    font-family:'Manrope', sans-serif; font-weight:700; font-size:12.5px;
+    color:var(--bronze);
+  }
+  .spa-toggle:hover{ color:var(--rose-deep); }
+  .spa-chev{ transition: transform .2s; display:inline-block; }
+  .spa-chev.open{ transform:rotate(180deg); }
+  .spa-details{
+    padding:0 16px 16px;
+  }
+  .spa-photo{
+    width:100%; height:auto; border-radius:12px; margin-bottom:12px; display:block;
+  }
+  .spa-list{
+    margin:0; padding-left:20px;
+    font-size:13px; line-height:1.7; color:var(--ink);
+  }
+  .spa-list li{ margin-bottom:5px; }
+  .spa-list li:last-child{ margin-bottom:0; }
 
   .services-footer{
     position:sticky;
@@ -669,10 +696,18 @@ const SERVICE_CATEGORIES = [
   {
     category: "SPA-программы",
     services: [
-      { id: "spa_relax", name: "SPA-программа «Релакс»", duration: 120, price: 4000 },
-      { id: "spa_bounty", name: "SPA-программа «Баунти»", duration: 140, price: 4300 },
-      { id: "spa_paradise", name: "SPA-программа «Райское наслаждение»", duration: 160, price: 5000 },
-      { id: "spa_detox", name: "SPA-программа «Детокс»", duration: 190, price: 5700 },
+      { id: "spa_relax", name: "SPA-программа «Релакс»", duration: 120, price: 4000,
+        photo: "spa-relaks.jpg",
+        includes: ["Распаривание в кедровой бочке", "Расслабляющий массаж с лавандовым маслом", "Классический массаж лица и головы", "Чаепитие с сухофруктами"] },
+      { id: "spa_bounty", name: "SPA-программа «Баунти»", duration: 140, price: 4300,
+        photo: "spa-baunti.jpg",
+        includes: ["Распаривание в кедровой бочке", "Общий массаж тела по скрабу кокос и лайм", "Классический массаж лица", "Альгинатная маска", "Чаепитие с сухофруктами"] },
+      { id: "spa_paradise", name: "SPA-программа «Райское наслаждение»", duration: 160, price: 5000,
+        photo: "spa-raiskoe.jpg",
+        includes: ["Распаривание в кедровой бочке", "Скрабирование тела скрабом цитрус", "Общий массаж тела с маслом цитрус", "Классический массаж лица", "Альгинатная маска", "Чаепитие с сухофруктами"] },
+      { id: "spa_detox", name: "SPA-программа «Детокс»", duration: 190, price: 5700,
+        photo: "spa-detoks.jpg",
+        includes: ["Распаривание в кедровой бочке", "Скрабирование тела скрабом Ламинария", "Общий массаж тела (усиленный)", "Обёртывание Ламинария", "Лимфодренажный массаж лица", "Альгинатная маска", "Чаепитие с сухофруктами"] },
     ]
   },
   {
@@ -892,14 +927,55 @@ function renderServices(){
       const el = document.createElement('div');
       el.className = 'service';
       el.dataset.id = svc.id;
+
+      const hasDetails = Array.isArray(svc.includes) && svc.includes.length > 0;
+
+      let detailsHtml = '';
+      if (hasDetails){
+        const photoHtml = svc.photo
+          ? `<img class="spa-photo" src="${svc.photo}" alt="${svc.name}" loading="lazy">`
+          : '';
+        const listItems = svc.includes.map(item => `<li>${item}</li>`).join('');
+        detailsHtml = `
+          <button class="spa-toggle" data-toggle="${svc.id}">
+            <span>Что входит в программу</span>
+            <span class="spa-chev" data-chev="${svc.id}">▾</span>
+          </button>
+          <div class="spa-details hidden" data-details="${svc.id}">
+            ${photoHtml}
+            <ul class="spa-list">${listItems}</ul>
+          </div>
+        `;
+      }
+
       el.innerHTML = `
-        <div>
-          <div class="service-name">${svc.name}</div>
-          <div class="service-meta">${formatDuration(svc.duration)}</div>
+        <div class="service-main">
+          <div class="service-row">
+            <div>
+              <div class="service-name">${svc.name}</div>
+              <div class="service-meta">${formatDuration(svc.duration)}</div>
+            </div>
+            <div class="service-price">${svc.price.toLocaleString('ru-RU')} ₽</div>
+          </div>
+          ${detailsHtml}
         </div>
-        <div class="service-price">${svc.price.toLocaleString('ru-RU')} ₽</div>
       `;
-      el.addEventListener('click', () => toggleService(svc.id));
+
+      // Клик по строке услуги — выбор для записи
+      el.querySelector('.service-row').addEventListener('click', () => toggleService(svc.id));
+
+      // Клик по «Что входит» — раскрытие описания, без выбора услуги
+      if (hasDetails){
+        const toggleBtn = el.querySelector(`[data-toggle="${svc.id}"]`);
+        toggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const details = el.querySelector(`[data-details="${svc.id}"]`);
+          const chev = el.querySelector(`[data-chev="${svc.id}"]`);
+          const nowHidden = details.classList.toggle('hidden');
+          chev.classList.toggle('open', !nowHidden);
+        });
+      }
+
       container.appendChild(el);
     });
   });
