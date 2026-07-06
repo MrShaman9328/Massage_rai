@@ -310,6 +310,53 @@
   .save-status{ text-align:center; font-size:12.5px; color:var(--good); margin-top:10px; min-height:16px; }
 
   .booking-card{ border:1.5px solid var(--line); border-radius:14px; padding:14px 16px; margin-bottom:10px; background:var(--bg-soft); }
+
+  .booking-card.booking-new{
+    border-color:var(--good);
+    border-width:2px;
+    background: rgba(110,156,124,0.10);
+    box-shadow: 0 4px 14px -6px rgba(110,156,124,0.4);
+  }
+  .new-badge{
+    display:inline-block;
+    background:var(--good);
+    color:#fff;
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    padding:2px 7px;
+    border-radius:20px;
+    vertical-align:middle;
+    margin-left:6px;
+  }
+  .new-bookings-banner{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    background: linear-gradient(135deg, rgba(110,156,124,0.16), rgba(156,130,102,0.12));
+    border:1.5px solid var(--good);
+    border-radius:14px;
+    padding:14px 16px;
+    margin-bottom:14px;
+  }
+  .new-bookings-count{
+    font-family:'Marcellus', serif;
+    font-size:16px;
+    color:var(--ink);
+  }
+  .mark-seen-btn{
+    padding:9px 14px;
+    border-radius:9px;
+    border:1.5px solid var(--good);
+    background:var(--good);
+    color:#fff;
+    font-family:'Manrope';
+    font-weight:700;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .mark-seen-btn:hover{ opacity:0.9; }
+  .mark-seen-btn:disabled{ opacity:0.5; cursor:not-allowed; }
   .booking-top{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
   .booking-date{ font-family:'Marcellus', serif; font-size:15px; }
   .booking-time{ font-weight:700; color:var(--rose-deep); }
@@ -570,10 +617,18 @@ const SERVICE_CATEGORIES = [
   {
     category: "SPA-программы",
     services: [
-      { id: "spa_relax", name: "SPA-программа «Релакс»", duration: 120, price: 4000 },
-      { id: "spa_bounty", name: "SPA-программа «Баунти»", duration: 140, price: 4300 },
-      { id: "spa_paradise", name: "SPA-программа «Райское наслаждение»", duration: 160, price: 5000 },
-      { id: "spa_detox", name: "SPA-программа «Детокс»", duration: 190, price: 5700 },
+      { id: "spa_relax", name: "SPA-программа «Релакс»", duration: 120, price: 4000,
+        photo: "spa-relaks.jpg",
+        includes: ["Распаривание в кедровой бочке", "Расслабляющий массаж с лавандовым маслом", "Классический массаж лица и головы", "Чаепитие с сухофруктами"] },
+      { id: "spa_bounty", name: "SPA-программа «Баунти»", duration: 140, price: 4300,
+        photo: "spa-baunti.jpg",
+        includes: ["Распаривание в кедровой бочке", "Общий массаж тела по скрабу кокос и лайм", "Классический массаж лица", "Альгинатная маска", "Чаепитие с сухофруктами"] },
+      { id: "spa_paradise", name: "SPA-программа «Райское наслаждение»", duration: 160, price: 5000,
+        photo: "spa-raiskoe.jpg",
+        includes: ["Распаривание в кедровой бочке", "Скрабирование тела скрабом цитрус", "Общий массаж тела с маслом цитрус", "Классический массаж лица", "Альгинатная маска", "Чаепитие с сухофруктами"] },
+      { id: "spa_detox", name: "SPA-программа «Детокс»", duration: 190, price: 5700,
+        photo: "spa-detoks.jpg",
+        includes: ["Распаривание в кедровой бочке", "Скрабирование тела скрабом Ламинария", "Общий массаж тела (усиленный)", "Обёртывание Ламинария", "Лимфодренажный массаж лица", "Альгинатная маска", "Чаепитие с сухофруктами"] },
     ]
   },
   {
@@ -652,6 +707,7 @@ async function callApi(action, extra){
 const Store = {
   schedule: {},
   bookings: [],
+  lastSeenAt: null,
 
   async loadSchedule(){
     try{
@@ -667,10 +723,16 @@ const Store = {
     try{
       const data = await callApi('getBookings');
       this.bookings = data.bookings || [];
+      this.lastSeenAt = data.lastSeenAt || null;
     }catch(e){
       console.error('loadBookings error:', e);
       this.bookings = [];
     }
+  },
+
+  async markBookingsSeen(){
+    await callApi('markBookingsSeen');
+    this.lastSeenAt = new Date().toISOString();
   },
 
   // Persist the full in-memory schedule in one call — the function overwrites
@@ -983,16 +1045,52 @@ function renderBookingsList(){
     return;
   }
 
+  // Запись считается новой, если создана позже последнего просмотра.
+  // Если мастер ещё ни разу не отмечал просмотр (lastSeenAt === null),
+  // новыми считаются все записи.
+  const lastSeen = Store.lastSeenAt ? new Date(Store.lastSeenAt).getTime() : 0;
+  const isNew = (b) => {
+    if (!b.createdAt) return false;
+    return new Date(b.createdAt).getTime() > lastSeen;
+  };
+
+  const newCount = upcoming.filter(isNew).length;
+
   list.innerHTML = '';
+
+  // Панель со счётчиком новых записей + кнопкой «отметить просмотренными»
+  if (newCount > 0){
+    const banner = document.createElement('div');
+    banner.className = 'new-bookings-banner';
+    banner.innerHTML = `
+      <span class="new-bookings-count">🔔 Новых записей: ${newCount}</span>
+      <button class="mark-seen-btn" id="markSeenBtn">Отметить все как просмотренные</button>
+    `;
+    list.appendChild(banner);
+    banner.querySelector('#markSeenBtn').addEventListener('click', async () => {
+      const btn = banner.querySelector('#markSeenBtn');
+      btn.disabled = true;
+      btn.textContent = 'Отмечаем...';
+      try{
+        await withTimeout(Store.markBookingsSeen(), 8000);
+        renderBookingsList();
+      }catch(e){
+        btn.disabled = false;
+        btn.textContent = 'Отметить все как просмотренные';
+        alert('Не удалось сохранить. Попробуйте снова.');
+      }
+    });
+  }
+
   upcoming.forEach(b => {
     const d = new Date(b.date + 'T00:00:00');
     const dateStr = d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
 
     const card = document.createElement('div');
-    card.className = 'booking-card';
+    card.className = 'booking-card' + (isNew(b) ? ' booking-new' : '');
     card.innerHTML = `
       <div class="booking-top">
-        <span class="booking-date">${dateStr}</span>
+        <span class="booking-date">${dateStr}${isNew(b) ? ' <span class="new-badge">НОВАЯ</span>' : ''}</span>
         <span class="booking-time">${b.start}–${b.end}</span>
       </div>
       <div class="booking-service">${b.serviceName} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
