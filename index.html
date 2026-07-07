@@ -257,6 +257,14 @@
   .btn-primary:not(:disabled):hover{ filter:brightness(1.06); }
   .btn-primary:not(:disabled):active{ transform:scale(0.98); }
   .btn-ghost{ background:transparent; color:var(--ink-soft); font-weight:600; padding:12px; font-size:13px; }
+  .btn-telegram{
+    display:block; text-align:center; text-decoration:none;
+    background: linear-gradient(135deg, #34AADF, #2894C9);
+    color:#fff;
+    box-shadow: 0 14px 30px -10px rgba(40,148,201,0.55);
+  }
+  .btn-telegram:hover{ filter:brightness(1.06); }
+  .btn-telegram:active{ transform:scale(0.98); }
   .btn-row{ display:flex; gap:10px; margin-top:6px; }
 
   /* ---------- Calendar ---------- */
@@ -605,6 +613,9 @@
         <div class="cancel-code-hint">Сохраните его — он понадобится, если нужно будет отменить запись</div>
       </div>
 
+      <a class="btn btn-telegram" style="margin-top:16px;" id="telegramReminderBtn" target="_blank" rel="noopener">🔔 Получать напоминания в Telegram</a>
+      <p style="font-size:12px; color:var(--ink-soft); text-align:center; margin:6px 0 0; line-height:1.4;">Откроется чат с ботом — просто нажмите кнопку Start внутри Telegram</p>
+
       <button class="btn btn-primary" style="margin-top:16px;" id="newBooking">Записаться ещё раз</button>
       <button class="btn btn-ghost" style="margin-top:4px;" id="cancelFromConfirm">Отменить эту запись</button>
     </div>
@@ -651,7 +662,7 @@
     <div class="seo-about">
       <h2 class="seo-about-title">Женский массажный салон в Краснодаре</h2>
       <p>Массажный салон «РАЙ» находится в Краснодаре, в микрорайоне ГМР, на улице Гидростроителей, 67. Мы специализируемся на женском массаже и предлагаем классический, расслабляющий и антицеллюлитный массаж тела, массаж лица, а также авторские SPA-программы и аппаратные процедуры. Каждый сеанс проводится индивидуально, в спокойной и уютной атмосфере.</p>
-      <p>Записаться на массаж в Краснодаре можно онлайн — прямо на этой странице, за пару минут: выберите услугу, удобные дату и время. Салон «РАЙ» имеет рейтинг 5.0 на Яндекс Картах по отзывам клиентов.</p>
+      <p>Записаться на массаж можно онлайн на этой странице, за пару минут: выберите услугу, удобные дату и время. Салон «РАЙ» имеет рейтинг 5.0 на Яндекс Картах по отзывам клиентов.</p>
     </div>
 
     <footer>
@@ -1329,6 +1340,7 @@ function showConfirmation(booking){
     <div class="row"><span>Телефон</span><span>${booking.clientPhone}</span></div>
   `;
   document.getElementById('cancelCodeDisplay').textContent = booking.cancelCode;
+  document.getElementById('telegramReminderBtn').href = `https://t.me/rai_massage_bot?start=${booking.id}`;
   clientState.lastBookingId = booking.id;
   goToStep(4);
 }
