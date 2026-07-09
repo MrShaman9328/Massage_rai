@@ -592,6 +592,11 @@
         <input type="text" id="clientComment" placeholder="Например: есть пожелания по маслу" maxlength="300">
       </div>
 
+      <div class="field" style="display:flex; align-items:flex-start; gap:8px; margin-top:4px;">
+        <input type="checkbox" id="consentPD" style="width:18px; height:18px; margin-top:2px; flex-shrink:0;">
+        <label for="consentPD" style="font-size:12px; color:var(--ink-soft); font-weight:400; line-height:1.4; text-transform:none;">Я согласен(-на) на обработку персональных данных в соответствии с 152-ФЗ</label>
+      </div>
+
       <div class="btn-row" style="margin-top:8px;">
         <button class="btn btn-ghost" id="backTo2">← Назад</button>
         <button class="btn btn-primary" id="submitBooking">Записаться</button>
@@ -1241,6 +1246,11 @@ async function submitBooking(){
 
   if (!name || !phone){
     alert('Пожалуйста, заполните имя и телефон');
+    return;
+  }
+
+  if (!document.getElementById('consentPD').checked){
+    alert('Пожалуйста, подтвердите согласие на обработку персональных данных');
     return;
   }
 

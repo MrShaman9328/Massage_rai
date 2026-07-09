@@ -551,7 +551,7 @@
 
     <div id="bookingsTab" class="hidden">
       <div class="panel">
-        <h2>Предстоящие записи</h2>
+        <h2>Предстоящие записи <span id="bookingsCount" style="font-weight:400; color:var(--ink-soft); font-size:0.7em;"></span></h2>
         <p class="hint">Все записи клиентов, начиная с сегодняшнего дня</p>
         <div id="bookingsList"></div>
       </div>
@@ -1041,6 +1041,7 @@ function renderBookingsList(){
     .sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
 
   if (upcoming.length === 0){
+    document.getElementById('bookingsCount').textContent = '';
     list.innerHTML = `<div class="empty-state">Пока нет предстоящих записей</div>`;
     return;
   }
@@ -1055,6 +1056,8 @@ function renderBookingsList(){
   };
 
   const newCount = upcoming.filter(isNew).length;
+
+  document.getElementById('bookingsCount').textContent = `(${upcoming.length})`;
 
   list.innerHTML = '';
 
