@@ -534,6 +534,20 @@
       <div class="save-status" id="cancelStatus"></div>
     </div>
 
+    <div class="cancel-entry">
+      <a id="openMyBookingsLink">Забыли, на какое время вы записаны?</a>
+    </div>
+    <div class="panel hidden" id="myBookingsPanel">
+      <h2 style="font-size:17px;">Моя запись</h2>
+      <p class="hint">Введите номер телефона, на который вы записывались</p>
+      <div class="field">
+        <input type="tel" id="myBookingsPhone" placeholder="+7 900 000-00-00" maxlength="18" inputmode="tel">
+      </div>
+      <button class="btn btn-primary" id="findMyBookings">Найти мою запись</button>
+      <div class="save-status" id="myBookingsStatus"></div>
+      <div id="myBookingsResults"></div>
+    </div>
+
     <div class="steps" id="stepsIndicator">
       <div class="step-dot" data-step="1"></div>
       <div class="step-dot" data-step="2"></div>
@@ -801,7 +815,7 @@ async function callApi(action, extra){
 
 const Store = {
   schedule: {},
-  bookings: [],
+  bookedSlots: [], // только {date, start, end} — без личных данных клиентов
 
   async loadSchedule(){
     try{
@@ -813,13 +827,13 @@ const Store = {
     }
   },
 
-  async loadBookings(){
+  async loadBookedSlots(){
     try{
-      const data = await callApi('getBookings');
-      this.bookings = data.bookings || [];
+      const data = await callApi('getBookedSlots');
+      this.bookedSlots = data.slots || [];
     }catch(e){
-      console.error('loadBookings error:', e);
-      this.bookings = [];
+      console.error('loadBookedSlots error:', e);
+      this.bookedSlots = [];
     }
   },
 
@@ -838,46 +852,17 @@ const Store = {
     await callApi('createBooking', { booking });
   },
 
-  async deleteBooking(bookingId, options){
-    await callApi('deleteBooking', { bookingId, notifyCancellation: !!(options && options.notifyCancellation) });
+  // Проверка кода и удаление записи теперь целиком происходит на сервере —
+  // клиенту не нужно (и не может) знать чужие коды отмены.
+  async cancelByCode(code){
+    return await callApi('cancelBookingByCode', { code });
   },
 
-  async updateBooking(bookingId, { date, start, end }){
-    await callApi('updateBookingTime', { bookingId, date, start, end });
+  // Сервер сам ищет совпадения — клиенту возвращаются только его записи.
+  async findByPhone(phone){
+    const data = await callApi('getBookingsByPhone', { phone });
+    return data.bookings || [];
   },
-
-  async markBooking(bookingId, status){
-    await callApi('markBooking', { bookingId, status });
-  },
-
-  async getHistory(){
-    const data = await callApi('getHistory');
-    return data.history || [];
-  },
-
-  async getClients(){
-    const data = await callApi('getClients');
-    return data.clients || {};
-  },
-
-  async saveClientNote(phone, notes){
-    await callApi('saveClientNote', { phone, notes });
-  },
-
-  async exportHistoryCsv(){
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'exportHistory' })
-    });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'rai-history.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-  }
 };
 
 function withTimeout(promise, ms){
@@ -1044,7 +1029,7 @@ function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
   const intervals = Store.schedule[dateKeyStr];
   if (!intervals || !Array.isArray(intervals) || intervals.length === 0) return [];
 
-  const bookingsToday = Store.bookings.filter(b => b.date === dateKeyStr);
+  const bookingsToday = Store.bookedSlots.filter(b => b.date === dateKeyStr);
   const slots = [];
   const STEP = 15;
   const BUFFER = 15; // минимальный промежуток между соседними записями
@@ -1298,8 +1283,8 @@ async function submitBooking(){
     // Уведомление в Telegram отправляется самой функцией на сервере — отдельного
     // вызова из браузера больше не требуется.
     await withTimeout(Store.saveNewBooking(booking), 20000);
-    if (!Store.bookings.some(b => b.id === booking.id)){
-      Store.bookings.push(booking);
+    if (!Store.bookedSlots.some(b => b.date === booking.date && b.start === booking.start && b.end === booking.end)){
+      Store.bookedSlots.push({ date: booking.date, start: booking.start, end: booking.end });
     }
     pendingBooking = null;
     showConfirmation(booking);
@@ -1315,7 +1300,7 @@ async function submitBooking(){
       btn.dataset.submitting = '0';
       btn.disabled = false;
       btn.textContent = 'Записаться';
-      try{ await Store.loadBookings(); }catch(err){ /* покажем что есть */ }
+      try{ await Store.loadBookedSlots(); }catch(err){ /* покажем что есть */ }
       goToStep(2);
       return;
     }
@@ -1361,22 +1346,18 @@ async function cancelBookingByCode(code, fromConfirmScreen){
     return { ok:false, message:'Введите 6-значный код отмены из подтверждения записи.' };
   }
 
-  const idx = Store.bookings.findIndex(b => b.cancelCode === trimmed);
-  if (idx === -1){
-    return { ok:false, message:'Запись с таким кодом не найдена. Возможно, она уже отменена.' };
-  }
-
-  const booking = Store.bookings[idx];
-  const dateObj = new Date(booking.date + 'T00:00:00');
-  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
-
   try{
-    // Передаём notifyCancellation=true — сервер сам отправит уведомление
-    // Дарье в Telegram именно для случая отмены клиентом (не мастером).
-    await withTimeout(Store.deleteBooking(booking.id, { notifyCancellation: true }), 8000);
-    Store.bookings.splice(idx, 1);
-    return { ok:true, message:`Запись на ${dateStr}, ${booking.start} отменена.`, booking };
+    // Сервер сам ищет запись по коду, проверяет и удаляет — код клиента
+    // никогда не сравнивается с локальным списком чужих записей.
+    const result = await withTimeout(Store.cancelByCode(trimmed), 8000);
+    const dateObj = new Date(result.date + 'T00:00:00');
+    const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
+    Store.bookedSlots = Store.bookedSlots.filter(b => !(b.date === result.date && b.start === result.start));
+    return { ok:true, message:`Запись на ${dateStr}, ${result.start} отменена.` };
   }catch(e){
+    if (e && String(e.message).includes('code-not-found')){
+      return { ok:false, message:'Запись с таким кодом не найдена. Возможно, она уже отменена.' };
+    }
     return { ok:false, message:'Не удалось отменить запись — проблема с подключением. Попробуйте снова.' };
   }
 }
@@ -1407,18 +1388,13 @@ function resetBooking(){
 // +7 (900) 000-00-00, чтобы все номера в базе были единообразны.
 
 function setupPhoneAutoFormat(input){
-  input.addEventListener('input', () => {
-    let digits = input.value.replace(/\D/g, '');
-
-    // Приводим к формату, начинающемуся с 7
+  function buildFormatted(rawDigits){
+    let digits = rawDigits;
     if (digits.startsWith('8')) digits = '7' + digits.slice(1);
     if (!digits.startsWith('7') && digits.length > 0) digits = '7' + digits;
-    digits = digits.slice(0, 11); // максимум 11 цифр (7 + 10)
+    digits = digits.slice(0, 11);
 
-    if (digits.length === 0){
-      input.value = '';
-      return;
-    }
+    if (digits.length === 0) return '';
 
     let formatted = '+7';
     const rest = digits.slice(1);
@@ -1426,8 +1402,56 @@ function setupPhoneAutoFormat(input){
     if (rest.length >= 3) formatted += ') ' + rest.slice(3, 6);
     if (rest.length >= 6) formatted += '-' + rest.slice(6, 8);
     if (rest.length >= 8) formatted += '-' + rest.slice(8, 10);
+    return formatted;
+  }
+
+  // Возвращает позицию курсора в отформатированной строке сразу после N-й цифры
+  function caretAfterDigit(formatted, digitCount){
+    if (digitCount <= 0) return formatted.length > 0 ? 2 : 0; // после "+7"
+    let count = 0;
+    for (let i = 0; i < formatted.length; i++){
+      if (/\d/.test(formatted[i])){
+        count++;
+        if (count === digitCount) return i + 1;
+      }
+    }
+    return formatted.length;
+  }
+
+  // Backspace/Delete обрабатываем вручную: находим ближайшую реальную цифру
+  // в направлении стирания и удаляем именно её, а не разделитель форматирования.
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+    if (input.selectionStart !== input.selectionEnd) return; // есть выделение — пусть браузер удаляет как обычно
+
+    const value = input.value;
+    const pos = input.selectionStart;
+    let removeIndex;
+
+    if (e.key === 'Backspace'){
+      removeIndex = pos - 1;
+      while (removeIndex >= 0 && !/\d/.test(value[removeIndex])) removeIndex--;
+      if (removeIndex < 0){ e.preventDefault(); return; }
+    } else {
+      removeIndex = pos;
+      while (removeIndex < value.length && !/\d/.test(value[removeIndex])) removeIndex++;
+      if (removeIndex >= value.length){ e.preventDefault(); return; }
+    }
+
+    e.preventDefault();
+    const digitsBeforeRemoved = (value.slice(0, removeIndex).match(/\d/g) || []).length;
+    const newValue = value.slice(0, removeIndex) + value.slice(removeIndex + 1);
+    const newDigits = newValue.replace(/\D/g, '');
+    const formatted = buildFormatted(newDigits);
 
     input.value = formatted;
+    const caret = caretAfterDigit(formatted, digitsBeforeRemoved);
+    input.setSelectionRange(caret, caret);
+  });
+
+  input.addEventListener('input', () => {
+    const digits = input.value.replace(/\D/g, '');
+    input.value = buildFormatted(digits);
   });
 
   // При фокусе на пустое поле сразу подставляем +7 — так пользователю
@@ -1442,7 +1466,7 @@ function setupPhoneAutoFormat(input){
 async function init(){
   renderServices();
   await Store.loadSchedule();
-  await Store.loadBookings();
+  await Store.loadBookedSlots();
   renderCalendar(); // refresh now that schedule/bookings are loaded
 
   setupPhoneAutoFormat(document.getElementById('clientPhone'));
@@ -1505,6 +1529,65 @@ async function init(){
     }
     btn.disabled = false;
     btn.textContent = 'Отменить запись';
+  });
+
+  document.getElementById('openMyBookingsLink').addEventListener('click', () => {
+    document.getElementById('myBookingsPanel').classList.toggle('hidden');
+  });
+  setupPhoneAutoFormat(document.getElementById('myBookingsPhone'));
+
+  document.getElementById('findMyBookings').addEventListener('click', async () => {
+    const phoneInput = document.getElementById('myBookingsPhone');
+    const btn = document.getElementById('findMyBookings');
+    const status = document.getElementById('myBookingsStatus');
+    const results = document.getElementById('myBookingsResults');
+
+    const digits = phoneInput.value.replace(/\D/g, '');
+    if (digits.length !== 11){
+      status.textContent = 'Введите полный номер телефона';
+      status.style.color = '#B07E7E';
+      results.innerHTML = '';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Ищем...';
+    status.textContent = '';
+    results.innerHTML = '';
+
+    let matches;
+    try{
+      // Сервер сам ищет и отдаёт только совпадения — чужие записи
+      // на этот номер телефона в браузер вообще не попадают.
+      matches = await withTimeout(Store.findByPhone(phoneInput.value), 8000);
+      matches = matches.slice().sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
+    }catch(e){
+      btn.disabled = false;
+      btn.textContent = 'Найти мою запись';
+      status.textContent = 'Не удалось выполнить поиск — проблема с подключением. Попробуйте снова.';
+      status.style.color = '#B07E7E';
+      return;
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Найти мою запись';
+
+    if (matches.length === 0){
+      status.textContent = 'Записи с таким номером не найдены';
+      status.style.color = '#B07E7E';
+      return;
+    }
+
+    status.textContent = '';
+    results.innerHTML = matches.map(b => {
+      const dateObj = new Date(b.date + 'T00:00:00');
+      const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
+      return `<div class="summary" style="margin-top:10px;">
+        <div class="row"><span>Дата</span><span>${dateStr}</span></div>
+        <div class="row"><span>Время</span><span>${b.start}</span></div>
+        <div class="row"><span>Услуга</span><span>${b.serviceName}</span></div>
+      </div>`;
+    }).join('');
   });
 }
 

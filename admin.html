@@ -691,11 +691,13 @@ function minutesToTime(mins){ const h = Math.floor(mins/60); const m = mins%60; 
 // ============================================================
 const API_URL = 'https://functions.yandexcloud.net/d4e2n6barn7affiaklbn';
 
+let currentAdminPassword = '';
+
 async function callApi(action, extra){
   const res = await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, ...extra })
+    body: JSON.stringify({ action, adminPassword: currentAdminPassword, ...extra })
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok){
@@ -780,7 +782,7 @@ const Store = {
     const res = await fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'exportHistory' })
+      body: JSON.stringify({ action: 'exportHistory', adminPassword: currentAdminPassword })
     });
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
@@ -1525,17 +1527,19 @@ async function renderAnalyticsTab(){
 }
 
 // ============================================================
-// ПРОСТАЯ ПАРОЛЬНАЯ ЗАЩИТА
+// ПАРОЛЬНАЯ ЗАЩИТА (проверка на сервере)
 // ============================================================
-// Это не "банковский" уровень защиты (пароль виден в коде страницы),
-// но полностью закрывает случайный заход посторонних людей по ссылке.
-// Чтобы сменить пароль — поменяйте строку ниже.
-const ADMIN_PASSWORD = 'rai2026';
+// Пароль сверяется в самой Cloud Function (переменная окружения
+// ADMIN_PASSWORD) — в браузере он нигде не хранится в открытом виде,
+// кроме как в sessionStorage на время активной сессии (нужно, чтобы
+// не спрашивать пароль повторно при каждом клике и при обновлении страницы).
 const SESSION_KEY = 'rai_admin_session';
+const SESSION_PASS_KEY = 'rai_admin_pass';
 const SESSION_DURATION_MS = 10 * 60 * 1000; // 10 минут
 
-function startSession(){
+function startSession(password){
   sessionStorage.setItem(SESSION_KEY, String(Date.now()));
+  sessionStorage.setItem(SESSION_PASS_KEY, password);
 }
 
 function hasValidSession(){
@@ -1547,6 +1551,7 @@ function hasValidSession(){
 
 function clearSession(){
   sessionStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_PASS_KEY);
 }
 
 function showAdmin(){
@@ -1565,16 +1570,29 @@ function scheduleAutoLogout(){
   }, Math.max(remaining, 0));
 }
 
-function checkPassword(){
+async function checkPassword(){
   const input = document.getElementById('passwordInput');
   const error = document.getElementById('passwordError');
-  if (input.value === ADMIN_PASSWORD){
-    startSession();
+  const btn = document.getElementById('loginButton');
+  const entered = input.value;
+
+  btn.disabled = true;
+  btn.textContent = 'Проверяем...';
+  error.textContent = '';
+
+  try{
+    currentAdminPassword = entered; // нужно ДО вызова — callApi берёт его отсюда
+    await withTimeout(callApi('adminLogin'), 8000);
+    startSession(entered);
     showAdmin();
-  } else {
+  }catch(e){
+    currentAdminPassword = '';
     error.textContent = 'Неверный пароль';
     input.value = '';
     input.focus();
+  }finally{
+    btn.disabled = false;
+    btn.textContent = 'Войти';
   }
 }
 
@@ -1603,6 +1621,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   if (hasValidSession()){
+    currentAdminPassword = sessionStorage.getItem(SESSION_PASS_KEY) || '';
     showAdmin();
   } else {
     clearSession();
