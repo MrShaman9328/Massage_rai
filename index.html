@@ -1582,7 +1582,7 @@ async function init(){
     results.innerHTML = matches.map(b => {
       const dateObj = new Date(b.date + 'T00:00:00');
       const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
-      return `<div class="summary" style="margin-top:10px;">
+      return `<div class="confirm-details" style="margin-top:10px;">
         <div class="row"><span>Дата</span><span>${dateStr}</span></div>
         <div class="row"><span>Время</span><span>${b.start}</span></div>
         <div class="row"><span>Услуга</span><span>${b.serviceName}</span></div>
