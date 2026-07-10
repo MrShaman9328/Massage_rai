@@ -791,6 +791,16 @@ function todayKey(){ const t = new Date(); return dateKeyFromParts(t.getFullYear
 function timeToMinutes(t){ const [h,m] = t.split(':').map(Number); return h*60+m; }
 function minutesToTime(mins){ const h = Math.floor(mins/60); const m = mins%60; return `${pad(h)}:${pad(m)}`; }
 
+// Экранируем спецсимволы перед вставкой данных клиента в innerHTML —
+// без этого имя/комментарий со скриптом внутри могли бы выполниться
+// в чужом браузере (XSS). Бэкенд теперь тоже режет угловые скобки на
+// входе, но это резервный слой на случай старых записей или будущих багов.
+function escapeHtml(str){
+  return String(str ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
 // ============================================================
 // ОБЩЕЕ ХРАНИЛИЩЕ (используется и клиентом, и мастером)
 // ============================================================
@@ -849,7 +859,11 @@ const Store = {
   },
 
   async saveNewBooking(booking){
-    await callApi('createBooking', { booking });
+    // Сервер сам генерирует cancelCode и createdAt и validated-версию
+    // остальных полей — возвращаем это клиенту, чтобы показать именно
+    // то, что реально сохранено (а не то, что клиент отправил).
+    const data = await callApi('createBooking', { booking });
+    return data.booking;
   },
 
   // Проверка кода и удаление записи теперь целиком происходит на сервере —
@@ -1025,11 +1039,31 @@ function updateServicesFooter(){
   btn.disabled = false;
 }
 
+// Те же пороги, что и на сервере (index.js) — держим в синхроне вручную,
+// это просто предпросмотр для UX, финальное решение всегда за сервером.
+const DAILY_CLOSE_THRESHOLD_MIN = 5.5 * 60; // 330 — при достижении дня закрывается
+const DAILY_HARD_CAP_MIN = 6.5 * 60;        // 390 — потолок, который нельзя пробить
+
+function getDailyBookedMinutes(bookingsToday){
+  return bookingsToday.reduce((sum, b) => sum + (timeToMinutes(b.end) - timeToMinutes(b.start)), 0);
+}
+
 function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
   const intervals = Store.schedule[dateKeyStr];
   if (!intervals || !Array.isArray(intervals) || intervals.length === 0) return [];
 
   const bookingsToday = Store.bookedSlots.filter(b => b.date === dateKeyStr);
+
+  // День закрыт целиком, если уже набрано 5,5ч — не тратим время клиента
+  // на показ слотов, которые сервер всё равно отклонит.
+  const dailyMinutes = getDailyBookedMinutes(bookingsToday);
+  if (dailyMinutes >= DAILY_CLOSE_THRESHOLD_MIN) return [];
+
+  // Если суммы пока не хватает для закрытия дня, но именно ЭТА услуга
+  // (например, длинная SPA-программа) пробила бы потолок 6,5ч — день
+  // остаётся открытым для более коротких услуг, просто не для этой.
+  if (dailyMinutes + durationMinutes > DAILY_HARD_CAP_MIN) return [];
+
   const slots = [];
   const STEP = 15;
   const BUFFER = 15; // минимальный промежуток между соседними записями
@@ -1282,12 +1316,15 @@ async function submitBooking(){
     // после паузы в обращениях, первый запрос иногда занимает дольше обычного.
     // Уведомление в Telegram отправляется самой функцией на сервере — отдельного
     // вызова из браузера больше не требуется.
-    await withTimeout(Store.saveNewBooking(booking), 20000);
+    const savedBooking = await withTimeout(Store.saveNewBooking(booking), 20000);
     if (!Store.bookedSlots.some(b => b.date === booking.date && b.start === booking.start && b.end === booking.end)){
       Store.bookedSlots.push({ date: booking.date, start: booking.start, end: booking.end });
     }
     pendingBooking = null;
-    showConfirmation(booking);
+    // savedBooking — это то, что реально записано на сервере (сервер сам
+    // проставляет cancelCode/createdAt). На случай сбоя ответа подстрахуемся
+    // локальным объектом, чтобы экран подтверждения не сломался совсем.
+    showConfirmation(savedBooking || booking);
   }catch(e){
     console.error('Booking submission error:', e);
 
@@ -1296,6 +1333,22 @@ async function submitBooking(){
     if (e && String(e.message).includes('slot-taken')){
       alert('Это время только что заняли. Пожалуйста, выберите другое.');
       pendingBooking = null;
+      clientState.selectedSlot = null;
+      btn.dataset.submitting = '0';
+      btn.disabled = false;
+      btn.textContent = 'Записаться';
+      try{ await Store.loadBookedSlots(); }catch(err){ /* покажем что есть */ }
+      goToStep(2);
+      return;
+    }
+
+    // Похожий случай: пока клиент оформлял запись, набралось 5,5ч на этот
+    // день и он закрылся для новых броней (например, кто-то другой успел
+    // записаться первым). Тоже возвращаем к выбору даты/времени.
+    if (e && String(e.message).includes('day-full')){
+      alert('На этот день уже набралось достаточно записей. Пожалуйста, выберите другую дату.');
+      pendingBooking = null;
+      clientState.selectedDate = null;
       clientState.selectedSlot = null;
       btn.dataset.submitting = '0';
       btn.disabled = false;
@@ -1328,11 +1381,11 @@ function showConfirmation(booking){
   const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
 
   document.getElementById('confirmDetails').innerHTML = `
-    <div class="row"><span>Услуга</span><span>${booking.serviceName}</span></div>
-    <div class="row"><span>Дата</span><span>${dateStr}</span></div>
-    <div class="row"><span>Время</span><span>${booking.start}–${booking.end}</span></div>
-    <div class="row"><span>Имя</span><span>${booking.clientName}</span></div>
-    <div class="row"><span>Телефон</span><span>${booking.clientPhone}</span></div>
+    <div class="row"><span>Услуга</span><span>${escapeHtml(booking.serviceName)}</span></div>
+    <div class="row"><span>Дата</span><span>${escapeHtml(dateStr)}</span></div>
+    <div class="row"><span>Время</span><span>${escapeHtml(booking.start)}–${escapeHtml(booking.end)}</span></div>
+    <div class="row"><span>Имя</span><span>${escapeHtml(booking.clientName)}</span></div>
+    <div class="row"><span>Телефон</span><span>${escapeHtml(booking.clientPhone)}</span></div>
   `;
   document.getElementById('cancelCodeDisplay').textContent = booking.cancelCode;
   document.getElementById('telegramReminderBtn').href = `https://t.me/rai_massage_bot?start=${booking.id}`;
@@ -1355,6 +1408,9 @@ async function cancelBookingByCode(code, fromConfirmScreen){
     Store.bookedSlots = Store.bookedSlots.filter(b => !(b.date === result.date && b.start === result.start));
     return { ok:true, message:`Запись на ${dateStr}, ${result.start} отменена.` };
   }catch(e){
+    if (e && String(e.message).includes('too-many-attempts')){
+      return { ok:false, message:'Слишком много попыток подряд. Подождите немного и попробуйте снова.' };
+    }
     if (e && String(e.message).includes('code-not-found')){
       return { ok:false, message:'Запись с таким кодом не найдена. Возможно, она уже отменена.' };
     }
@@ -1583,9 +1639,9 @@ async function init(){
       const dateObj = new Date(b.date + 'T00:00:00');
       const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
       return `<div class="confirm-details" style="margin-top:10px;">
-        <div class="row"><span>Дата</span><span>${dateStr}</span></div>
-        <div class="row"><span>Время</span><span>${b.start}</span></div>
-        <div class="row"><span>Услуга</span><span>${b.serviceName}</span></div>
+        <div class="row"><span>Дата</span><span>${escapeHtml(dateStr)}</span></div>
+        <div class="row"><span>Время</span><span>${escapeHtml(b.start)}</span></div>
+        <div class="row"><span>Услуга</span><span>${escapeHtml(b.serviceName)}</span></div>
       </div>`;
     }).join('');
   });
