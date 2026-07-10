@@ -1041,8 +1041,10 @@ function updateServicesFooter(){
 
 // Те же пороги, что и на сервере (index.js) — держим в синхроне вручную,
 // это просто предпросмотр для UX, финальное решение всегда за сервером.
-const DAILY_CLOSE_THRESHOLD_MIN = 5.5 * 60; // 330 — при достижении дня закрывается
-const DAILY_HARD_CAP_MIN = 6.5 * 60;        // 390 — потолок, который нельзя пробить
+// Считаем фактическое время услуг (end−start), 15-минутные буферы между
+// визитами сюда не входят.
+const DAILY_CLOSE_THRESHOLD_MIN = 5 * 60; // 300 — при достижении дня закрывается
+const DAILY_HARD_CAP_MIN = 6 * 60;        // 360 — потолок, который нельзя пробить
 
 function getDailyBookedMinutes(bookingsToday){
   return bookingsToday.reduce((sum, b) => sum + (timeToMinutes(b.end) - timeToMinutes(b.start)), 0);
@@ -1054,13 +1056,13 @@ function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
 
   const bookingsToday = Store.bookedSlots.filter(b => b.date === dateKeyStr);
 
-  // День закрыт целиком, если уже набрано 5,5ч — не тратим время клиента
+  // День закрыт целиком, если уже набрано 5ч — не тратим время клиента
   // на показ слотов, которые сервер всё равно отклонит.
   const dailyMinutes = getDailyBookedMinutes(bookingsToday);
   if (dailyMinutes >= DAILY_CLOSE_THRESHOLD_MIN) return [];
 
   // Если суммы пока не хватает для закрытия дня, но именно ЭТА услуга
-  // (например, длинная SPA-программа) пробила бы потолок 6,5ч — день
+  // (например, длинная SPA-программа) пробила бы потолок 6ч — день
   // остаётся открытым для более коротких услуг, просто не для этой.
   if (dailyMinutes + durationMinutes > DAILY_HARD_CAP_MIN) return [];
 
@@ -1342,7 +1344,7 @@ async function submitBooking(){
       return;
     }
 
-    // Похожий случай: пока клиент оформлял запись, набралось 5,5ч на этот
+    // Похожий случай: пока клиент оформлял запись, набралось 5ч на этот
     // день и он закрылся для новых броней (например, кто-то другой успел
     // записаться первым). Тоже возвращаем к выбору даты/времени.
     if (e && String(e.message).includes('day-full')){
