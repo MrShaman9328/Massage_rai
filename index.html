@@ -331,33 +331,6 @@
     cursor:pointer;
   }
   .cancel-entry a:hover{ border-color:var(--rose); }
-  .cancel-code-box{
-    background:var(--bg-soft);
-    border:1.5px dashed var(--line);
-    border-radius:14px;
-    padding:16px;
-    text-align:center;
-    margin-top:16px;
-  }
-  .cancel-code-label{
-    font-size:11.5px;
-    text-transform:uppercase;
-    letter-spacing:0.06em;
-    color:var(--ink-soft);
-    margin-bottom:6px;
-  }
-  .cancel-code-value{
-    font-family:'Marcellus', serif;
-    font-size:26px;
-    letter-spacing:0.15em;
-    color:var(--rose-deep);
-  }
-  .cancel-code-hint{
-    font-size:11.5px;
-    color:var(--ink-soft);
-    margin-top:6px;
-    line-height:1.5;
-  }
 
   footer{ text-align:center; margin-top:30px; font-size:12px; color:var(--ink-soft); line-height:1.7; }
 
@@ -522,30 +495,50 @@
   
 
     <div class="cancel-entry">
-      <a id="openCancelLink">Отмена ранее забронированного времени</a>
-    </div>
-    <div class="panel hidden" id="cancelPanel">
-      <h2 style="font-size:17px;">Отмена записи</h2>
-      <p class="hint">Введите 6-значный код, который вы получили при записи</p>
-      <div class="field">
-        <input type="text" id="cancelCodeInput" placeholder="000000" maxlength="6" inputmode="numeric" style="text-align:center; font-size:20px; letter-spacing:0.2em; font-weight:700;">
-      </div>
-      <button class="btn btn-primary" id="submitCancelCode">Отменить запись</button>
-      <div class="save-status" id="cancelStatus"></div>
+      <a id="openMyBookingsLink">Уже записаны? Отменить или узнать время</a>
     </div>
 
-    <div class="cancel-entry">
-      <a id="openMyBookingsLink">Забыли, на какое время вы записаны?</a>
-    </div>
     <div class="panel hidden" id="myBookingsPanel">
-      <h2 style="font-size:17px;">Моя запись</h2>
-      <p class="hint">Введите номер телефона, на который вы записывались</p>
+      <h2 style="font-size:17px;">Ваша запись</h2>
+      <p class="hint">Введите номер телефона, на который записывались</p>
       <div class="field">
         <input type="tel" id="myBookingsPhone" placeholder="+7 900 000-00-00" maxlength="18" inputmode="tel">
       </div>
-      <button class="btn btn-primary" id="findMyBookings">Найти мою запись</button>
+      <!-- honeypot: обычный человек это поле не видит и не заполняет, только скрипты -->
+      <div style="position:absolute; left:-9999px; top:-9999px;" aria-hidden="true">
+        <label for="myBookingsWebsite">Website</label>
+        <input type="text" id="myBookingsWebsite" name="website" tabindex="-1" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="findMyBookings">Найти запись</button>
       <div class="save-status" id="myBookingsStatus"></div>
+    </div>
+
+    <div class="panel hidden" id="myBookingsListPanel">
+      <h2 style="font-size:17px;">Ваши записи</h2>
       <div id="myBookingsResults"></div>
+      <button class="btn btn-ghost" style="margin-top:4px;" id="backToPhoneSearch">← Ввести другой номер</button>
+    </div>
+
+    <div class="panel hidden" id="cancelConfirmPanel">
+      <h2 style="font-size:17px;">Отменить запись?</h2>
+      <p class="hint" id="cancelConfirmDetails"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="cancelConfirmNo">Не отменять</button>
+        <button class="btn btn-primary" id="cancelConfirmYes" style="background:var(--rose-deep);">Да, отменить</button>
+      </div>
+      <div class="save-status" id="cancelConfirmStatus"></div>
+    </div>
+
+    <div class="panel hidden" id="reschedulePanel">
+      <h2 style="font-size:17px;">Изменить время</h2>
+      <p class="hint" id="rescheduleHint"></p>
+      <div class="slots-grid" id="rescheduleSlotsGrid"></div>
+      <div id="rescheduleEmpty" class="hidden empty-state">Ой, простите — свободного времени на этот день, кажется, больше нет 🙏<br>Попробуйте выбрать другой день заново, через новую запись.</div>
+      <div class="btn-row" style="margin-top:16px;">
+        <button class="btn btn-ghost" id="rescheduleBack">← Назад</button>
+        <button class="btn btn-primary" id="rescheduleConfirm" disabled>Подтвердить новое время</button>
+      </div>
+      <div class="save-status" id="rescheduleStatus"></div>
     </div>
 
     <div class="steps" id="stepsIndicator">
@@ -626,17 +619,10 @@
       <p class="confirm-sub">Дарья получила уведомление и подтвердит запись лично — ожидайте звонок или сообщение.</p>
       <div class="confirm-details" id="confirmDetails"></div>
 
-      <div class="cancel-code-box">
-        <div class="cancel-code-label">Код отмены записи</div>
-        <div class="cancel-code-value" id="cancelCodeDisplay"></div>
-        <div class="cancel-code-hint">Сохраните его — он понадобится, если нужно будет отменить запись</div>
-      </div>
-
       <a class="btn btn-telegram" style="margin-top:16px;" id="telegramReminderBtn" target="_blank" rel="noopener">🔔 Получать напоминания в Telegram</a>
       <p style="font-size:12px; color:var(--ink-soft); text-align:center; margin:6px 0 0; line-height:1.4;">Откроется чат с ботом — просто нажмите кнопку Start внутри Telegram</p>
 
       <button class="btn btn-primary" style="margin-top:16px;" id="newBooking">Записаться ещё раз</button>
-      <button class="btn btn-ghost" style="margin-top:4px;" id="cancelFromConfirm">Отменить эту запись</button>
     </div>
 
     <div class="panel reviews-panel" id="reviewsPanel">
@@ -866,16 +852,19 @@ const Store = {
     return data.booking;
   },
 
-  // Проверка кода и удаление записи теперь целиком происходит на сервере —
-  // клиенту не нужно (и не может) знать чужие коды отмены.
-  async cancelByCode(code){
-    return await callApi('cancelBookingByCode', { code });
+  // Проверка телефона и поиск/отмена/перенос теперь целиком на сервере —
+  // клиент только показывает то, что сервер разрешил (см. index.js).
+  async findByPhone(phone, hp){
+    const data = await callApi('getBookingsByPhone', { phone, hp });
+    return data.bookings || [];
   },
 
-  // Сервер сам ищет совпадения — клиенту возвращаются только его записи.
-  async findByPhone(phone){
-    const data = await callApi('getBookingsByPhone', { phone });
-    return data.bookings || [];
+  async cancelByPhone(phone, id){
+    return await callApi('cancelBookingByPhone', { phone, id });
+  },
+
+  async rescheduleByPhone(phone, id, newStart){
+    return await callApi('rescheduleBookingByPhone', { phone, id, newStart });
   },
 };
 
@@ -1050,16 +1039,26 @@ function getDailyBookedMinutes(bookingsToday){
   return bookingsToday.reduce((sum, b) => sum + (timeToMinutes(b.end) - timeToMinutes(b.start)), 0);
 }
 
-function getAvailableSlotsForDate(dateKeyStr, durationMinutes){
+// excludeSlot — необязательный {start, end}: при переносе времени уже
+// существующей брони исключаем её собственный текущий слот из подсчёта,
+// иначе бронь мешала бы сама себе и сдвиг даже на 15–30 минут был бы
+// невозможен. Для обычной записи (excludeSlot не передан) поведение то же,
+// что и раньше.
+function getAvailableSlotsForDate(dateKeyStr, durationMinutes, excludeSlot){
   const intervals = Store.schedule[dateKeyStr];
   if (!intervals || !Array.isArray(intervals) || intervals.length === 0) return [];
 
-  const bookingsToday = Store.bookedSlots.filter(b => b.date === dateKeyStr);
+  let bookingsToday = Store.bookedSlots.filter(b => b.date === dateKeyStr);
+  if (excludeSlot){
+    bookingsToday = bookingsToday.filter(b => !(b.start === excludeSlot.start && b.end === excludeSlot.end));
+  }
 
-  // День закрыт целиком, если уже набрано 5ч — не тратим время клиента
-  // на показ слотов, которые сервер всё равно отклонит.
+  // «Мягкий» порог закрытия дня — это ограничение против переполнения
+  // НОВЫМИ записями. При переносе клиент двигает свою же уже учтённую
+  // бронь внутри того же дня, поэтому этот порог здесь не применяем —
+  // только жёсткий потолок 6ч чуть ниже.
   const dailyMinutes = getDailyBookedMinutes(bookingsToday);
-  if (dailyMinutes >= DAILY_CLOSE_THRESHOLD_MIN) return [];
+  if (!excludeSlot && dailyMinutes >= DAILY_CLOSE_THRESHOLD_MIN) return [];
 
   // Если суммы пока не хватает для закрытия дня, но именно ЭТА услуга
   // (например, длинная SPA-программа) пробила бы потолок 6ч — день
@@ -1293,7 +1292,6 @@ async function submitBooking(){
 
     pendingBooking = {
       id: 'bk_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
-      cancelCode: generateCancelCode(),
       date: clientState.selectedDate,
       start: clientState.selectedSlot,
       end: endTime,
@@ -1374,10 +1372,6 @@ async function submitBooking(){
   }
 }
 
-function generateCancelCode(){
-  return String(Math.floor(100000 + Math.random()*900000)); // 6-digit code
-}
-
 function showConfirmation(booking){
   const dateObj = new Date(booking.date + 'T00:00:00');
   const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
@@ -1389,35 +1383,116 @@ function showConfirmation(booking){
     <div class="row"><span>Имя</span><span>${escapeHtml(booking.clientName)}</span></div>
     <div class="row"><span>Телефон</span><span>${escapeHtml(booking.clientPhone)}</span></div>
   `;
-  document.getElementById('cancelCodeDisplay').textContent = booking.cancelCode;
   document.getElementById('telegramReminderBtn').href = `https://t.me/rai_massage_bot?start=${booking.id}`;
   clientState.lastBookingId = booking.id;
   goToStep(4);
 }
 
-async function cancelBookingByCode(code, fromConfirmScreen){
-  const trimmed = (code || '').trim();
-  if (!/^\d{6}$/.test(trimmed)){
-    return { ok:false, message:'Введите 6-значный код отмены из подтверждения записи.' };
+// ============================================================
+// «ВАША ЗАПИСЬ» — поиск по телефону, отмена и перенос времени
+// ============================================================
+// Владение бронью подтверждается телефоном (тем же, что уже прошёл
+// проверку в getBookingsByPhone) — взамен прежнего 6-значного кода.
+// Все проверки задваиваются на сервере (index.js), это только UI.
+
+const myBookingsState = {
+  phone: null,        // как ввёл клиент — нужен для последующих cancel/reschedule
+  bookings: [],        // последний результат поиска
+  activeBooking: null,  // бронь, которую сейчас отменяют/переносят
+  selectedNewStart: null,
+};
+
+function showMyBookingsScreen(id){
+  ['myBookingsPanel','myBookingsListPanel','cancelConfirmPanel','reschedulePanel'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+
+function renderMyBookingsList(){
+  const container = document.getElementById('myBookingsResults');
+  container.innerHTML = myBookingsState.bookings.map(b => {
+    const dateObj = new Date(b.date + 'T00:00:00');
+    const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
+    return `
+      <div class="booking-card">
+        <div class="booking-top"><span class="booking-date">${escapeHtml(dateStr)}</span><span class="booking-time">${escapeHtml(b.start)}</span></div>
+        <div class="booking-service">${escapeHtml(b.serviceName)}</div>
+        <div class="btn-row" style="margin-top:8px;">
+          <button class="btn btn-ghost reschedule-btn" data-id="${escapeHtml(b.id)}" style="font-size:12.5px; padding:8px;">Изменить время</button>
+          <button class="btn btn-ghost cancel-btn" data-id="${escapeHtml(b.id)}" style="font-size:12.5px; padding:8px; color:var(--rose-deep);">Отменить</button>
+        </div>
+      </div>`;
+  }).join('');
+
+  container.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => openCancelConfirm(btn.dataset.id));
+  });
+  container.querySelectorAll('.reschedule-btn').forEach(btn => {
+    btn.addEventListener('click', () => openReschedule(btn.dataset.id));
+  });
+}
+
+function openCancelConfirm(bookingId){
+  const booking = myBookingsState.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+  myBookingsState.activeBooking = booking;
+
+  const dateObj = new Date(booking.date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
+  document.getElementById('cancelConfirmDetails').textContent =
+    `${dateStr}, ${booking.start} · ${booking.serviceName}. Время снова станет доступно другим клиентам.`;
+  document.getElementById('cancelConfirmStatus').textContent = '';
+  document.getElementById('cancelConfirmYes').disabled = false;
+  document.getElementById('cancelConfirmYes').textContent = 'Да, отменить';
+  showMyBookingsScreen('cancelConfirmPanel');
+}
+
+function openReschedule(bookingId){
+  const booking = myBookingsState.bookings.find(b => b.id === bookingId);
+  if (!booking) return;
+  myBookingsState.activeBooking = booking;
+  myBookingsState.selectedNewStart = null;
+
+  const dateObj = new Date(booking.date + 'T00:00:00');
+  const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+  document.getElementById('rescheduleHint').textContent = `${dateStr} · свободное время в этот день`;
+  document.getElementById('rescheduleStatus').textContent = '';
+  document.getElementById('rescheduleConfirm').disabled = true;
+
+  renderRescheduleSlots();
+  showMyBookingsScreen('reschedulePanel');
+}
+
+function renderRescheduleSlots(){
+  const booking = myBookingsState.activeBooking;
+  const grid = document.getElementById('rescheduleSlotsGrid');
+  const empty = document.getElementById('rescheduleEmpty');
+  const duration = timeToMinutes(booking.end) - timeToMinutes(booking.start);
+
+  const slots = getAvailableSlotsForDate(booking.date, duration, { start: booking.start, end: booking.end });
+
+  if (slots.length === 0){
+    grid.classList.add('hidden');
+    empty.classList.remove('hidden');
+    return;
   }
 
-  try{
-    // Сервер сам ищет запись по коду, проверяет и удаляет — код клиента
-    // никогда не сравнивается с локальным списком чужих записей.
-    const result = await withTimeout(Store.cancelByCode(trimmed), 8000);
-    const dateObj = new Date(result.date + 'T00:00:00');
-    const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long' });
-    Store.bookedSlots = Store.bookedSlots.filter(b => !(b.date === result.date && b.start === result.start));
-    return { ok:true, message:`Запись на ${dateStr}, ${result.start} отменена.` };
-  }catch(e){
-    if (e && String(e.message).includes('too-many-attempts')){
-      return { ok:false, message:'Слишком много попыток подряд. Подождите немного и попробуйте снова.' };
-    }
-    if (e && String(e.message).includes('code-not-found')){
-      return { ok:false, message:'Запись с таким кодом не найдена. Возможно, она уже отменена.' };
-    }
-    return { ok:false, message:'Не удалось отменить запись — проблема с подключением. Попробуйте снова.' };
-  }
+  grid.classList.remove('hidden');
+  empty.classList.add('hidden');
+  grid.innerHTML = '';
+  slots.forEach(s => {
+    const el = document.createElement('div');
+    el.className = 'slot';
+    el.textContent = s;
+    if (myBookingsState.selectedNewStart === s) el.classList.add('selected');
+    el.addEventListener('click', () => {
+      myBookingsState.selectedNewStart = s;
+      grid.querySelectorAll('.slot').forEach(x => x.classList.remove('selected'));
+      el.classList.add('selected');
+      document.getElementById('rescheduleConfirm').disabled = false;
+    });
+    grid.appendChild(el);
+  });
 }
 
 function resetBooking(){
@@ -1552,45 +1627,8 @@ async function init(){
   document.getElementById('submitBooking').addEventListener('click', submitBooking);
   document.getElementById('newBooking').addEventListener('click', resetBooking);
 
-  document.getElementById('cancelFromConfirm').addEventListener('click', async () => {
-    const btn = document.getElementById('cancelFromConfirm');
-    const code = document.getElementById('cancelCodeDisplay').textContent;
-    btn.disabled = true;
-    btn.textContent = 'Отменяем...';
-    const result = await cancelBookingByCode(code, true);
-    if (result.ok){
-      alert('Запись отменена. ' + result.message);
-      resetBooking();
-    } else {
-      alert(result.message);
-      btn.disabled = false;
-      btn.textContent = 'Отменить эту запись';
-    }
-  });
-
-  document.getElementById('openCancelLink').addEventListener('click', () => {
-    document.getElementById('cancelPanel').classList.toggle('hidden');
-  });
-  document.getElementById('submitCancelCode').addEventListener('click', async () => {
-    const input = document.getElementById('cancelCodeInput');
-    const btn = document.getElementById('submitCancelCode');
-    const status = document.getElementById('cancelStatus');
-    btn.disabled = true;
-    btn.textContent = 'Проверяем...';
-    status.textContent = '';
-    const result = await cancelBookingByCode(input.value, false);
-    status.textContent = result.message;
-    status.style.color = result.ok ? 'var(--good)' : '#B07E7E';
-    if (result.ok){
-      input.value = '';
-      renderCalendar();
-    }
-    btn.disabled = false;
-    btn.textContent = 'Отменить запись';
-  });
-
   document.getElementById('openMyBookingsLink').addEventListener('click', () => {
-    document.getElementById('myBookingsPanel').classList.toggle('hidden');
+    showMyBookingsScreen('myBookingsPanel');
   });
   setupPhoneAutoFormat(document.getElementById('myBookingsPhone'));
 
@@ -1598,54 +1636,147 @@ async function init(){
     const phoneInput = document.getElementById('myBookingsPhone');
     const btn = document.getElementById('findMyBookings');
     const status = document.getElementById('myBookingsStatus');
-    const results = document.getElementById('myBookingsResults');
+    const honeypot = document.getElementById('myBookingsWebsite').value;
 
     const digits = phoneInput.value.replace(/\D/g, '');
     if (digits.length !== 11){
       status.textContent = 'Введите полный номер телефона';
       status.style.color = '#B07E7E';
-      results.innerHTML = '';
       return;
     }
 
     btn.disabled = true;
     btn.textContent = 'Ищем...';
     status.textContent = '';
-    results.innerHTML = '';
 
-    let matches;
+    let bookings;
     try{
       // Сервер сам ищет и отдаёт только совпадения — чужие записи
       // на этот номер телефона в браузер вообще не попадают.
-      matches = await withTimeout(Store.findByPhone(phoneInput.value), 8000);
-      matches = matches.slice().sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
+      bookings = await withTimeout(Store.findByPhone(phoneInput.value, honeypot), 8000);
+      bookings = bookings.slice().sort((a,b) => (a.date+a.start).localeCompare(b.date+b.start));
     }catch(e){
       btn.disabled = false;
-      btn.textContent = 'Найти мою запись';
-      status.textContent = 'Не удалось выполнить поиск — проблема с подключением. Попробуйте снова.';
+      btn.textContent = 'Найти запись';
+      if (e && String(e.message).includes('too-many-attempts')){
+        status.textContent = 'Слишком много попыток подряд. Подождите немного и попробуйте снова.';
+      } else {
+        status.textContent = 'Не удалось выполнить поиск — проблема с подключением. Попробуйте снова.';
+      }
       status.style.color = '#B07E7E';
       return;
     }
 
     btn.disabled = false;
-    btn.textContent = 'Найти мою запись';
+    btn.textContent = 'Найти запись';
 
-    if (matches.length === 0){
+    if (bookings.length === 0){
       status.textContent = 'Записи с таким номером не найдены';
       status.style.color = '#B07E7E';
       return;
     }
 
     status.textContent = '';
-    results.innerHTML = matches.map(b => {
-      const dateObj = new Date(b.date + 'T00:00:00');
-      const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
-      return `<div class="confirm-details" style="margin-top:10px;">
-        <div class="row"><span>Дата</span><span>${escapeHtml(dateStr)}</span></div>
-        <div class="row"><span>Время</span><span>${escapeHtml(b.start)}</span></div>
-        <div class="row"><span>Услуга</span><span>${escapeHtml(b.serviceName)}</span></div>
-      </div>`;
-    }).join('');
+    myBookingsState.phone = phoneInput.value;
+    myBookingsState.bookings = bookings;
+    renderMyBookingsList();
+    showMyBookingsScreen('myBookingsListPanel');
+  });
+
+  document.getElementById('backToPhoneSearch').addEventListener('click', () => {
+    document.getElementById('myBookingsStatus').textContent = '';
+    showMyBookingsScreen('myBookingsPanel');
+  });
+
+  document.getElementById('cancelConfirmNo').addEventListener('click', () => {
+    showMyBookingsScreen('myBookingsListPanel');
+  });
+
+  document.getElementById('cancelConfirmYes').addEventListener('click', async () => {
+    const btn = document.getElementById('cancelConfirmYes');
+    const status = document.getElementById('cancelConfirmStatus');
+    const booking = myBookingsState.activeBooking;
+    if (!booking) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Отменяем...';
+    status.textContent = '';
+
+    try{
+      await withTimeout(Store.cancelByPhone(myBookingsState.phone, booking.id), 8000);
+      Store.bookedSlots = Store.bookedSlots.filter(b => !(b.date === booking.date && b.start === booking.start));
+      myBookingsState.bookings = myBookingsState.bookings.filter(b => b.id !== booking.id);
+      renderCalendar();
+      status.textContent = 'Запись отменена. Дарья получит уведомление автоматически.';
+      status.style.color = 'var(--good)';
+      btn.textContent = 'Готово';
+      btn.disabled = false;
+      btn.onclick = () => {
+        renderMyBookingsList();
+        showMyBookingsScreen(myBookingsState.bookings.length ? 'myBookingsListPanel' : 'myBookingsPanel');
+      };
+    }catch(e){
+      if (e && String(e.message).includes('too-many-attempts')){
+        status.textContent = 'Слишком много попыток подряд. Подождите немного и попробуйте снова.';
+      } else if (e && String(e.message).includes('booking-not-found')){
+        status.textContent = 'Эта запись уже недоступна — возможно, уже отменена.';
+      } else {
+        status.textContent = 'Не удалось отменить — проблема с подключением. Попробуйте снова.';
+      }
+      status.style.color = '#B07E7E';
+      btn.disabled = false;
+      btn.textContent = 'Да, отменить';
+    }
+  });
+
+  document.getElementById('rescheduleBack').addEventListener('click', () => {
+    showMyBookingsScreen('myBookingsListPanel');
+  });
+
+  document.getElementById('rescheduleConfirm').addEventListener('click', async () => {
+    const btn = document.getElementById('rescheduleConfirm');
+    const status = document.getElementById('rescheduleStatus');
+    const booking = myBookingsState.activeBooking;
+    const newStart = myBookingsState.selectedNewStart;
+    if (!booking || !newStart) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Сохраняем...';
+    status.textContent = '';
+
+    try{
+      const result = await withTimeout(Store.rescheduleByPhone(myBookingsState.phone, booking.id, newStart), 8000);
+      Store.bookedSlots = Store.bookedSlots.filter(b => !(b.date === booking.date && b.start === booking.start));
+      Store.bookedSlots.push({ date: result.date, start: result.start, end: result.end });
+      const idx = myBookingsState.bookings.findIndex(b => b.id === booking.id);
+      if (idx !== -1) myBookingsState.bookings[idx] = { ...myBookingsState.bookings[idx], start: result.start, end: result.end };
+      renderCalendar();
+      status.textContent = `Время изменено на ${result.start}.`;
+      status.style.color = 'var(--good)';
+      btn.textContent = 'Готово';
+      btn.disabled = false;
+      btn.onclick = () => {
+        renderMyBookingsList();
+        showMyBookingsScreen('myBookingsListPanel');
+      };
+    }catch(e){
+      if (e && String(e.message).includes('too-many-attempts')){
+        status.textContent = 'Слишком много попыток подряд. Подождите немного и попробуйте снова.';
+      } else if (e && String(e.message).includes('slot-taken')){
+        status.textContent = 'Это время только что заняли. Выберите другое.';
+        renderRescheduleSlots();
+      } else if (e && String(e.message).includes('day-full')){
+        status.textContent = 'На этот день уже набралось достаточно записей.';
+        renderRescheduleSlots();
+      } else if (e && String(e.message).includes('booking-not-found')){
+        status.textContent = 'Эта запись уже недоступна — возможно, уже отменена.';
+      } else {
+        status.textContent = 'Не удалось сохранить — проблема с подключением. Попробуйте снова.';
+      }
+      status.style.color = '#B07E7E';
+      btn.disabled = false;
+      btn.textContent = 'Подтвердить новое время';
+    }
   });
 }
 
