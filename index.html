@@ -1628,7 +1628,11 @@ async function init(){
   document.getElementById('newBooking').addEventListener('click', resetBooking);
 
   document.getElementById('openMyBookingsLink').addEventListener('click', () => {
-    showMyBookingsScreen('myBookingsPanel');
+    const screens = ['myBookingsPanel','myBookingsListPanel','cancelConfirmPanel','reschedulePanel'];
+    const anyOpen = screens.some(id => !document.getElementById(id).classList.contains('hidden'));
+    // Второй клик по ссылке закрывает весь блок целиком, из какого бы
+    // экрана внутри него ни кликнули — так же, как раньше работал toggle.
+    showMyBookingsScreen(anyOpen ? null : 'myBookingsPanel');
   });
   setupPhoneAutoFormat(document.getElementById('myBookingsPhone'));
 
