@@ -98,7 +98,7 @@
     position:absolute;
     inset:0;
     background: url('bg-header.jpg') center 20%/cover no-repeat;
-    opacity:0.55;
+    opacity:0.8;
     /* Плавное затухание вниз — без этого был бы виден жёсткий край фото */
     -webkit-mask-image: linear-gradient(to bottom, black 0%, black 40%, transparent 92%);
             mask-image: linear-gradient(to bottom, black 0%, black 40%, transparent 92%);
@@ -755,16 +755,16 @@ const SERVICE_CATEGORIES = [
   {
     category: "Аппаратный массаж",
     services: [
+      { id: "sphere_vibro", name: "Вибро-компрессионный массаж сферами", duration: 75, price: 2800 },
       { id: "microcurrent_face", name: "Микротоки по лицу", duration: 30, price: 1500 },
       { id: "rf_face", name: "RF лифтинг по лицу", duration: 30, price: 1000 },
       { id: "rf_body", name: "RF лифтинг по телу (1 зона)", duration: 30, price: 1000 },
       { id: "vacuum", name: "Вакуумный массаж (1 зона)", duration: 30, price: 1000 },
       { id: "vibro", name: "Турбо-вибрационный массаж", duration: 30, price: 1000 },
       { id: "presso", name: "Прессотерапия", duration: 30, price: 700 },
-      { id: "cedar_barrel", name: "Кедровая бочка", duration: 15, price: 700 },
       { id: "spider", name: "Лимфодренажный аппарат с вакуумом «Паук»", duration: 30, price: 700 },
       { id: "myostim", name: "Миостимуляция", duration: 30, price: 700 },
-      { id: "sphere_vibro", name: "Вибро-компрессионный массаж сферами", duration: 75, price: 2800 },
+      { id: "cedar_barrel", name: "Кедровая бочка", duration: 15, price: 700 },
     ]
   }
 ];
