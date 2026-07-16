@@ -153,8 +153,12 @@
 
   /* Лёгкая фоновая подложка за выбором услуг — сама карточка остаётся
      белой (var(--card)), картинка проступает поверх неё слабым тоном,
-     а сервис-карточки и текст сверху всё так же на непрозрачном фоне. */
-  #step1{ position:relative; z-index:0; overflow:hidden; }
+     а сервис-карточки и текст сверху всё так же на непрозрачном фоне.
+     ВАЖНО: overflow:hidden тут раньше стоял на #step1 (для скругления
+     углов картинки), но это ломает position:sticky у .services-footer —
+     sticky не работает, если у предка overflow отличен от visible.
+     Скругление вместо этого делаем прямо на слое картинки. */
+  #step1{ position:relative; z-index:0; }
   #step1::before{
     content:"";
     position:absolute;
@@ -163,6 +167,7 @@
     opacity:0.15;
     z-index:-1;
     pointer-events:none;
+    border-radius: inherit;
   }
 
   /* ---------- Category labels ---------- */
