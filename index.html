@@ -283,6 +283,16 @@
   .btn-primary:not(:disabled):hover{ filter:brightness(1.06); }
   .btn-primary:not(:disabled):active{ transform:scale(0.98); }
   .btn-ghost{ background:transparent; color:var(--ink-soft); font-weight:600; padding:12px; font-size:13px; }
+  .my-booking-actions .btn{
+    border:1.5px solid var(--line);
+    border-radius:9px;
+    background:transparent;
+    font-weight:700;
+  }
+  .my-booking-actions .reschedule-btn{ color:var(--bronze); }
+  .my-booking-actions .reschedule-btn:hover{ background:rgba(156,130,102,0.08); }
+  .my-booking-actions .cancel-btn{ color:var(--rose-deep); }
+  .my-booking-actions .cancel-btn:hover{ background:rgba(176,126,126,0.08); }
   .btn-telegram{
     display:block; text-align:center; text-decoration:none;
     background: linear-gradient(135deg, #34AADF, #2894C9);
@@ -1442,11 +1452,11 @@ function renderMyBookingsList(){
     const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
     return `
       <div class="booking-card">
-        <div class="booking-top"><span class="booking-date">${escapeHtml(dateStr)}</span><span class="booking-time">${escapeHtml(b.start)}</span></div>
+        <div class="booking-top"><span class="booking-date">${escapeHtml(dateStr)}</span><span class="booking-time">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span></div>
         <div class="booking-service">${escapeHtml(b.serviceName)}</div>
-        <div class="btn-row" style="margin-top:8px;">
-          <button class="btn btn-ghost reschedule-btn" data-id="${escapeHtml(b.id)}" style="font-size:12.5px; padding:8px;">Изменить время</button>
-          <button class="btn btn-ghost cancel-btn" data-id="${escapeHtml(b.id)}" style="font-size:12.5px; padding:8px; color:var(--rose-deep);">Отменить</button>
+        <div class="btn-row my-booking-actions" style="margin-top:8px;">
+          <button class="btn reschedule-btn" data-id="${escapeHtml(b.id)}" style="font-size:12.5px; padding:8px;">Изменить время</button>
+          <button class="btn cancel-btn" data-id="${escapeHtml(b.id)}" style="font-size:12.5px; padding:8px;">Отменить</button>
         </div>
       </div>`;
   }).join('');
