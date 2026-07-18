@@ -1176,8 +1176,8 @@ const Store = {
     return await callApi('rescheduleBookingByPhone', { phone, id, newStart });
   },
 
-  async submitPackageLead(clientName, clientPhone, packageTier, hp){
-    return await callApi('submitPackageLead', { clientName, clientPhone, packageTier, hp });
+  async submitPackageLead(id, clientName, clientPhone, packageTier, hp){
+    return await callApi('submitPackageLead', { id, clientName, clientPhone, packageTier, hp });
   },
 };
 
@@ -1596,6 +1596,7 @@ function renderSummary(){
 }
 
 let pendingBooking = null; // переживает повторные клики на одну и ту же попытку записи
+let pendingPackageLeadId = null; // тот же приём для заявки на абонемент — см. submitBooking
 
 async function submitBooking(){
   const btn = document.getElementById('submitBooking');
@@ -2038,6 +2039,9 @@ async function init(){
     const status = document.getElementById('packageLeadStatus');
     const honeypot = document.getElementById('packageLeadWebsite').value;
 
+    // Защита от двойного клика — та же, что у submitBooking.
+    if (btn.dataset.submitting === '1') return;
+
     const name = nameInput.value.trim();
     if (name.length < 2){
       status.textContent = 'Введите имя';
@@ -2056,29 +2060,48 @@ async function init(){
       return;
     }
 
+    // id создаём один раз и держим на все повторные попытки этой же заявки —
+    // если сеть подвела на ответе (частая история на мобильном интернете),
+    // повтор с тем же id сервер распознает как дубль и не создаст запись
+    // второй раз и не отправит Дарье повторное уведомление в Telegram.
+    if (!pendingPackageLeadId){
+      pendingPackageLeadId = 'pl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    btn.dataset.submitting = '1';
     btn.disabled = true;
     btn.textContent = 'Отправляем...';
     status.textContent = '';
 
     try{
-      await Store.submitPackageLead(name, phoneInput.value, selectedPackageTier, honeypot);
+      await withTimeout(
+        Store.submitPackageLead(pendingPackageLeadId, name, phoneInput.value, selectedPackageTier, honeypot),
+        15000
+      );
       status.textContent = 'Заявка отправлена — Дарья скоро перезвонит 🌿';
       status.style.color = 'var(--good)';
       nameInput.value = '';
       phoneInput.value = '';
       selectedPackageTier = null;
+      pendingPackageLeadId = null;
       document.querySelectorAll('.package-tier-card').forEach(c => c.classList.remove('selected'));
       btn.textContent = 'Оставить заявку';
       setTimeout(closePackageLeadModal, 1800);
     }catch(e){
+      // Запрос мог реально дойти и сохраниться на сервере, а упасть уже
+      // здесь — на приёме ответа (обрыв мобильной сети). Раз id тот же самый,
+      // повторное нажатие в этом случае просто найдёт уже сохранённую заявку
+      // и покажет обычное «Заявка отправлена», а не создаст вторую — поэтому
+      // просим нажать ещё раз, а не пугаем явной формулировкой «ошибка».
       if (e && String(e.message).includes('too-many-attempts')){
         status.textContent = 'Слишком много попыток подряд. Подождите немного и попробуйте снова.';
       } else {
-        status.textContent = 'Не удалось отправить — проблема с подключением. Попробуйте снова.';
+        status.textContent = 'Не получили ответ от сервера — возможно, заявка всё же дошла. Нажмите ещё раз, чтобы убедиться.';
       }
       status.style.color = '#B07E7E';
       btn.textContent = 'Оставить заявку';
     }
+    btn.dataset.submitting = '0';
     btn.disabled = false;
   });
 
