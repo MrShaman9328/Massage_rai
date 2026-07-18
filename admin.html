@@ -402,6 +402,22 @@
   .edit-booking-btn{ color:var(--bronze); }
   .edit-booking-btn:hover{ background:rgba(156,130,102,0.08); }
 
+  .mark-lead-done-btn{
+    width:100%;
+    margin-top:8px;
+    padding:9px;
+    border-radius:9px;
+    border:1.5px solid var(--line);
+    background:transparent;
+    color:var(--bronze);
+    font-family:'Manrope';
+    font-weight:700;
+    font-size:12.5px;
+    cursor:pointer;
+  }
+  .mark-lead-done-btn:hover{ background:rgba(156,130,102,0.08); }
+  .mark-lead-done-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
   .edit-form{
     margin-top:10px;
     padding-top:10px;
@@ -1520,7 +1536,7 @@ async function renderLeadsTab(){
       <div class="booking-service" style="color:var(--ink-soft); font-size:12px;">Заявка от ${escapeHtml(dateStr)}</div>
       ${lead.done
         ? `<div class="lead-done-badge">✓ Обработано</div>`
-        : `<button class="btn btn-ghost mark-lead-done-btn" data-id="${escapeHtml(lead.id)}" style="margin-top:8px;">Отметить обработанной</button>`}
+        : `<button class="mark-lead-done-btn" data-id="${escapeHtml(lead.id)}">Отметить обработанной</button>`}
     `;
     if (!lead.done){
       card.querySelector('.mark-lead-done-btn').addEventListener('click', async (e) => {
