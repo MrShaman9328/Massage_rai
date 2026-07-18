@@ -264,8 +264,30 @@
   .reviews-link:hover{ text-decoration:underline; }
 
   /* ============== ADMIN-SPECIFIC ============== */
-  .tabs{ display:flex; background:var(--card); border-radius:14px; padding:5px; box-shadow:var(--shadow); margin-bottom:18px; }
-  .tab{ flex:1; text-align:center; padding:11px; border-radius:10px; font-weight:700; font-size:13.5px; cursor:pointer; color:var(--ink-soft); transition:.2s; }
+  .tabs{
+    display:flex;
+    background:var(--card);
+    border-radius:14px;
+    padding:5px;
+    box-shadow:var(--shadow);
+    margin-bottom:18px;
+    overflow-x:auto;
+    -webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .tabs::-webkit-scrollbar{ display:none; }
+  .tab{
+    flex:0 0 auto;
+    white-space:nowrap;
+    text-align:center;
+    padding:11px 16px;
+    border-radius:10px;
+    font-weight:700;
+    font-size:13.5px;
+    cursor:pointer;
+    color:var(--ink-soft);
+    transition:.2s;
+  }
   .tab.active{ background:var(--rose-deep); color:#fff; }
 
   .week-nav{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
@@ -442,9 +464,6 @@
   .edit-status{ text-align:center; font-size:12px; min-height:14px; }
 
   .hidden{ display:none !important; }
-
-  /* --- Вкладок теперь 5 — уменьшаем шрифт чуть-чуть --- */
-  .tab{ font-size:12px; padding:9px 6px; }
 
   /* --- История --- */
   .history-section-title{
