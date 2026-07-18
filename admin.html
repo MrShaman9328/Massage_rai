@@ -341,6 +341,14 @@
     vertical-align:middle;
     margin-left:6px;
   }
+  .lead-done{ opacity:0.55; }
+  .lead-done-badge{
+    display:inline-block;
+    margin-top:8px;
+    font-size:12px;
+    font-weight:700;
+    color:var(--good);
+  }
   .new-bookings-banner{
     display:flex;
     flex-direction:column;
@@ -540,6 +548,7 @@
       <div class="tab" data-tab="bookings">Записи</div>
       <div class="tab" data-tab="history">История</div>
       <div class="tab" data-tab="clients">Клиенты</div>
+      <div class="tab" data-tab="leads">Заявки</div>
       <div class="tab" data-tab="analytics">Аналитика</div>
     </div>
 
@@ -582,6 +591,14 @@
         <h2>База клиентов</h2>
         <p class="hint">Заполняется автоматически после каждого выполненного визита</p>
         <div id="clientsList"></div>
+      </div>
+    </div>
+
+    <div id="leadsTab" class="hidden">
+      <div class="panel">
+        <h2>Заявки на абонемент</h2>
+        <p class="hint">Заявки со страницы «Специальные предложения» — не бронь, клиенту нужно перезвонить</p>
+        <div id="leadsList"></div>
       </div>
     </div>
 
@@ -799,6 +816,15 @@ const Store = {
 
   async saveClientNote(phone, notes){
     await callApi('saveClientNote', { phone, notes });
+  },
+
+  async getPackageLeads(){
+    const data = await callApi('getPackageLeads');
+    return data.leads || [];
+  },
+
+  async markPackageLeadDone(leadId){
+    await callApi('markPackageLeadDone', { leadId });
   },
 
   async exportHistoryCsv(){
@@ -1234,7 +1260,7 @@ function setupAdminTabs(){
       document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
       tab.classList.add('active');
       const target = tab.dataset.tab;
-      ['scheduleTab','bookingsTab','historyTab','clientsTab','analyticsTab'].forEach(id => {
+      ['scheduleTab','bookingsTab','historyTab','clientsTab','leadsTab','analyticsTab'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.classList.add('hidden');
       });
@@ -1244,6 +1270,7 @@ function setupAdminTabs(){
       if (target === 'bookings') renderBookingsList();
       if (target === 'history')  renderHistoryTab();
       if (target === 'clients')  renderClientsTab();
+      if (target === 'leads')    renderLeadsTab();
       if (target === 'analytics') renderAnalyticsTab();
     });
   });
@@ -1456,6 +1483,58 @@ async function renderClientsTab(){
       }
       e.target.disabled = false;
     });
+    container.appendChild(card);
+  });
+}
+
+const PACKAGE_TIER_LABELS = { '5': '5 сеансов', '10': '10 сеансов', '15': '15 сеансов' };
+
+async function renderLeadsTab(){
+  const container = document.getElementById('leadsList');
+  container.innerHTML = '<div class="empty-state">Загружаем...</div>';
+
+  let leads = [];
+  try{ leads = await Store.getPackageLeads(); }
+  catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+
+  if (leads.length === 0){
+    container.innerHTML = '<div class="empty-state">Пока нет заявок на абонемент</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  leads.forEach(lead => {
+    const dateObj = new Date(lead.createdAt);
+    const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long' }) + ', ' +
+      dateObj.toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+    const packageLabel = PACKAGE_TIER_LABELS[lead.packageTier] || lead.packageTier;
+
+    const card = document.createElement('div');
+    card.className = 'booking-card' + (lead.done ? ' lead-done' : '');
+    card.innerHTML = `
+      <div class="booking-top">
+        <span class="booking-date">${escapeHtml(lead.clientName)}</span>
+        <span class="booking-time">${escapeHtml(packageLabel)}</span>
+      </div>
+      <div class="booking-client">${escapeHtml(lead.clientPhone)}</div>
+      <div class="booking-service" style="color:var(--ink-soft); font-size:12px;">Заявка от ${escapeHtml(dateStr)}</div>
+      ${lead.done
+        ? `<div class="lead-done-badge">✓ Обработано</div>`
+        : `<button class="btn btn-ghost mark-lead-done-btn" data-id="${escapeHtml(lead.id)}" style="margin-top:8px;">Отметить обработанной</button>`}
+    `;
+    if (!lead.done){
+      card.querySelector('.mark-lead-done-btn').addEventListener('click', async (e) => {
+        e.target.disabled = true;
+        e.target.textContent = 'Сохраняем...';
+        try{
+          await Store.markPackageLeadDone(lead.id);
+          renderLeadsTab();
+        }catch(err){
+          e.target.disabled = false;
+          e.target.textContent = 'Отметить обработанной';
+        }
+      });
+    }
     container.appendChild(card);
   });
 }
