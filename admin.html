@@ -726,7 +726,12 @@ function formatDuration(minutes) {
   if (m === 0) return `${h} ч`;
   return `${h} ч ${m} мин`;
 }
-
+// Различаем "Классический массаж" тела (60/90 мин) и лица (30 мин) —
+// в каталоге имя специально одинаковое, отличаем по длительности.
+function disambiguateServiceName(name, duration){
+  if (name !== 'Классический массаж') return name;
+  return duration === 30 ? 'Классический массаж (лицо)' : 'Классический массаж (тело)';
+}
 // ============================================================
 // Примечание: уведомления в Telegram теперь отправляются на стороне
 // Cloud Function (внутри createBooking/deleteBooking), а не из браузера.
@@ -1189,7 +1194,7 @@ function renderBookingsList(){
         <span class="booking-date">${dateStr}${isNew(b) ? ' <span class="new-badge">НОВАЯ</span>' : ''}${isChanged(b) ? ' <span class="changed-badge">ИЗМЕНЕНА</span>' : ''}</span>
         <span class="booking-time">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span>
       </div>
-      <div class="booking-service">${escapeHtml(b.serviceName)} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
+      <div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
       <div class="booking-client">${escapeHtml(b.clientName)} · ${escapeHtml(b.clientPhone)}</div>
       ${b.comment ? `<div class="booking-comment">💬 ${escapeHtml(b.comment)}</div>` : ''}
       ${b.clientNotes ? `<div class="booking-comment client-note">📌 ${escapeHtml(b.clientNotes)}</div>` : ''}
@@ -1406,7 +1411,7 @@ function buildWaitingCard(b){
       <span class="booking-date">${dateStr}</span>
       <span class="booking-time">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span>
     </div>
-    <div class="booking-service">${escapeHtml(b.serviceName)} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
+    <div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
     <div class="booking-client">${escapeHtml(b.clientName)} · ${escapeHtml(b.clientPhone)}</div>
     <div class="mark-actions">
       <button class="mark-btn mark-completed" data-id="${escapeHtml(b.id)}">✅ Пришёл</button>
@@ -1431,7 +1436,7 @@ function buildHistoryCard(h){
       <span class="booking-date">${dateStr}</span>
       <span class="booking-time">${escapeHtml(h.start)}–${escapeHtml(h.end)}</span>
     </div>
-    <div class="booking-service">${escapeHtml(h.serviceName)} · ${h.servicePrice.toLocaleString('ru-RU')} ₽</div>
+    <div class="booking-service">${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${h.servicePrice.toLocaleString('ru-RU')} ₽</div>
     <div class="booking-client">${escapeHtml(h.clientName)} · ${escapeHtml(h.clientPhone)}</div>
     ${statusBadge}
   `;
