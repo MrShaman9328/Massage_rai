@@ -339,6 +339,9 @@
   .field input{ width:100%; padding:14px 16px; border-radius:12px; border:1.5px solid var(--line); font-family:'Manrope'; font-size:15px; background:var(--bg-soft); color:var(--ink); }
   .field input:focus{ outline:none; border-color:var(--rose-deep); }
   .field input::placeholder{ color:#C2B2AD; }
+  .field input.input-warn{ border-color:var(--rose-deep); }
+  .phone-warn{ display:none; margin-top:6px; font-size:12px; color:var(--rose-deep); line-height:1.4; }
+  .phone-warn.visible{ display:block; }
 
   /* ---------- Summary ---------- */
   .summary{ background:var(--bg-soft); border-radius:14px; padding:16px 18px; margin-bottom:20px; border:1.5px dashed var(--line); }
@@ -1618,10 +1621,13 @@ async function submitBooking(){
     return;
   }
 
+  // Мобильный РФ: 11 цифр, код страны 7 (принимаем и 8), код оператора — всегда
+  // на 9. Проверка на 9 отсекает и «+7 (8xx)», и городские номера, по которым
+  // Дарья потом не дозвонится.
   const digitsOnly = phone.replace(/\D/g, '');
-  // Accept 11 digits (e.g. 79001234567 / 89001234567) — Russian mobile format
-  if (digitsOnly.length !== 11 || !/^[78]/.test(digitsOnly)){
-    alert('Введите корректный номер мобильного телефона, например +7 900 000-00-00');
+  const phoneDigits = digitsOnly.startsWith('8') ? '7' + digitsOnly.slice(1) : digitsOnly;
+  if (phoneDigits.length !== 11 || !/^79/.test(phoneDigits)){
+    alert('Проверьте номер телефона: мобильный начинается с +7 9, например +7 900 000-00-00');
     return;
   }
 
@@ -1865,10 +1871,29 @@ function resetBooking(){
 // +7 (900) 000-00-00, чтобы все номера в базе были единообразны.
 
 function setupPhoneAutoFormat(input){
+  // Подсказка под полем — показываем, если код оператора не начинается с 9
+  // (городской номер, опечатка). Создаём её из JS, чтобы не дублировать
+  // разметку у всех трёх полей телефона на странице.
+  const warn = document.createElement('div');
+  warn.className = 'phone-warn';
+  warn.textContent = 'Проверьте номер: мобильный начинается с +7 9…';
+  input.insertAdjacentElement('afterend', warn);
+
+  function updateWarn(){
+    const digits = input.value.replace(/\D/g, '');
+    const bad = digits.length >= 2 && digits.charAt(1) !== '9';
+    warn.classList.toggle('visible', bad);
+    input.classList.toggle('input-warn', bad);
+  }
+
   function buildFormatted(rawDigits){
     let digits = rawDigits;
     if (digits.startsWith('8')) digits = '7' + digits.slice(1);
     if (!digits.startsWith('7') && digits.length > 0) digits = '7' + digits;
+    // Частая ошибка: в поле уже стоит «+7», а человек по привычке набирает
+    // номер с восьмёрки — получается +7 (8xx). Мобильных кодов на 8 не бывает,
+    // поэтому лишнюю восьмёрку сразу после кода страны молча выбрасываем.
+    while (digits.length > 1 && digits.charAt(1) === '8') digits = '7' + digits.slice(2);
     digits = digits.slice(0, 11);
 
     if (digits.length === 0) return '';
@@ -1924,11 +1949,13 @@ function setupPhoneAutoFormat(input){
     input.value = formatted;
     const caret = caretAfterDigit(formatted, digitsBeforeRemoved);
     input.setSelectionRange(caret, caret);
+    updateWarn();
   });
 
   input.addEventListener('input', () => {
     const digits = input.value.replace(/\D/g, '');
     input.value = buildFormatted(digits);
+    updateWarn();
   });
 
   // При фокусе на пустое поле сразу подставляем +7 — так пользователю
@@ -2049,8 +2076,10 @@ async function init(){
       return;
     }
     const digits = phoneInput.value.replace(/\D/g, '');
-    if (digits.length !== 11){
-      status.textContent = 'Введите полный номер телефона';
+    // Та же проверка, что и при записи: 11 цифр и код оператора на 9.
+    const leadDigits = digits.startsWith('8') ? '7' + digits.slice(1) : digits;
+    if (leadDigits.length !== 11 || !/^79/.test(leadDigits)){
+      status.textContent = 'Проверьте номер: мобильный начинается с +7 9';
       status.style.color = '#B07E7E';
       return;
     }
