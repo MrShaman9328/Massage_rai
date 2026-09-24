@@ -537,6 +537,52 @@
   }
   .save-note-btn:hover{ color:var(--rose-deep); border-color:var(--rose-deep); }
 
+  /* --- Клиенты: поиск --- */
+  .client-search{ position:relative; margin-bottom:8px; }
+  .client-search input{
+    width:100%; padding:12px 40px 12px 14px; border-radius:12px;
+    border:1.5px solid var(--line); background:var(--bg-soft);
+    font-family:'Manrope'; font-size:14px; color:var(--ink);
+    -webkit-appearance:none; appearance:none;
+  }
+  .client-search input:focus{ outline:none; border-color:var(--rose-deep); }
+  .client-search input::placeholder{ color:#C2B2AD; }
+  .client-search input::-webkit-search-cancel-button{ display:none; }
+  .client-search-clear{
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    width:26px; height:26px; border-radius:50%; border:none;
+    background:var(--line); color:var(--ink-soft); font-size:12px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0;
+  }
+  .client-search-count{ font-size:12px; color:var(--ink-soft); margin:0 0 12px; min-height:16px; }
+
+  /* --- Клиенты: раскрывающийся список посещений --- */
+  .visits-toggle{
+    display:flex; align-items:center; gap:5px;
+    margin:2px 0 4px; padding:0;
+    background:none; border:none; cursor:pointer;
+    font-family:'Manrope', sans-serif; font-weight:700; font-size:12.5px;
+    color:var(--bronze);
+  }
+  .visits-toggle:hover{ color:var(--rose-deep); }
+  .visits-chev{ transition:transform .2s; display:inline-block; }
+  .visits-chev.open{ transform:rotate(180deg); }
+  .visits-list{
+    margin:6px 0 10px; border-top:1px dashed var(--line);
+    max-height:320px; overflow-y:auto; -webkit-overflow-scrolling:touch;
+  }
+  .visit-row{
+    display:flex; justify-content:space-between; gap:10px;
+    padding:8px 0; border-bottom:1px solid var(--line); font-size:12.5px;
+  }
+  .visit-row:last-child{ border-bottom:none; }
+  .visit-when{ white-space:nowrap; color:var(--ink); font-weight:600; }
+  .visit-when small{ display:block; font-weight:400; color:var(--ink-soft); }
+  .visit-what{ text-align:right; color:var(--ink-soft); line-height:1.4; }
+  .visit-what b{ color:var(--ink); font-weight:600; }
+  .visit-row.noshow .visit-what b{ text-decoration:line-through; color:var(--ink-soft); }
+  .visit-noshow-tag{ color:var(--rose-deep); font-weight:700; }
+
   /* --- Аналитика --- */
   .analytics-summary{
     display:grid; grid-template-columns:1fr 1fr;
@@ -639,6 +685,11 @@
       <div class="panel">
         <h2>База клиентов</h2>
         <p class="hint">Заполняется автоматически после каждого выполненного визита</p>
+        <div class="client-search">
+          <input type="search" id="clientsSearch" placeholder="Поиск по имени или телефону" autocomplete="off" enterkeyhint="search">
+          <button type="button" class="client-search-clear hidden" id="clientsSearchClear" aria-label="Очистить поиск">✕</button>
+        </div>
+        <div class="client-search-count" id="clientsSearchCount"></div>
         <div id="clientsList"></div>
       </div>
     </div>
@@ -1541,68 +1592,229 @@ async function markBooking(bookingId, status, card){
 // БАЗА КЛИЕНТОВ
 // ============================================================
 
+// Ключ для сопоставления истории с карточкой — последние 10 цифр номера.
+// Так «+7 (918)…», «8918…» и «7918…» считаются одним человеком, в том числе
+// для старых записей истории, сделанных до перехода на clientKey().
+function phoneTail10(phone){
+  return String(phone ?? '').replace(/\D/g, '').slice(-10);
+}
+
+// Для поиска по имени: регистр и ё/е не важны.
+function normName(str){
+  return String(str ?? '').toLowerCase().replace(/ё/g, 'е').trim();
+}
+
+// Кэш вкладки: грузим клиентов и историю один раз при открытии вкладки,
+// а поиск и раскрытие списков дальше работают без запросов к серверу.
+const clientsView = {
+  list: null,             // карточки клиентов (null — ещё не загружены)
+  historyByPhone: {},     // tail10 → все записи истории этого номера (новые сверху)
+  query: '',
+  openedVisits: new Set(), // у кого список посещений раскрыт — переживает фильтрацию
+  noteDrafts: new Map(),   // несохранённые заметки — чтобы поиск их не стирал
+};
+
 async function renderClientsTab(){
   const container = document.getElementById('clientsList');
   container.innerHTML = '<div class="empty-state">Загружаем...</div>';
+  document.getElementById('clientsSearchCount').textContent = '';
 
   let clients = {};
-  try{ clients = await Store.getClients(); }
-  catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+  let history = [];
+  try{
+    // Историю берём тем же action, что и вкладка «История» — бэкенд не трогаем.
+    [clients, history] = await Promise.all([Store.getClients(), Store.getHistory()]);
+  }catch(e){
+    container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>';
+    return;
+  }
+
+  const byPhone = {};
+  history.forEach(h => {
+    const key = phoneTail10(h.clientPhone);
+    if (!key) return;
+    (byPhone[key] = byPhone[key] || []).push(h);
+  });
+  Object.values(byPhone).forEach(arr =>
+    arr.sort((a,b) => ((b.date||'') + (b.start||'')).localeCompare((a.date||'') + (a.start||'')))
+  );
 
   const list = Object.values(clients);
-  if (list.length === 0){
+  list.sort((a,b) => (b.lastVisit||'').localeCompare(a.lastVisit||''));
+
+  clientsView.list = list;
+  clientsView.historyByPhone = byPhone;
+  renderClientsList();
+}
+
+function clientMatchesQuery(client, query){
+  const q = normName(query);
+  if (!q) return true;
+  if (normName(client.name).includes(q)) return true;
+
+  // Телефон: сравниваем только цифры. Ищем и по полному номеру, и по «хвосту»
+  // без кода страны — чтобы «8918…», «+7918…» и «918…» находили одно и то же.
+  const qDigits = q.replace(/\D/g, '');
+  if (qDigits.length < 2) return false;
+  const full = String(client.phone ?? '').replace(/\D/g, '');
+  const tail = phoneTail10(client.phone);
+  if (full.includes(qDigits) || tail.includes(qDigits)) return true;
+  if (/^[78]/.test(qDigits) && qDigits.length > 1 && tail.startsWith(qDigits.slice(1))) return true;
+  return false;
+}
+
+function renderClientsList(){
+  const container = document.getElementById('clientsList');
+  const countEl = document.getElementById('clientsSearchCount');
+  const all = clientsView.list;
+  if (!all) return; // вкладка ещё не загружалась — искать не в чем
+
+  if (all.length === 0){
+    countEl.textContent = '';
     container.innerHTML = '<div class="empty-state">База клиентов пуста — она заполняется после первого выполненного визита</div>';
     return;
   }
 
-  // Сортируем по дате последнего визита (новые сверху)
-  list.sort((a,b) => (b.lastVisit||'').localeCompare(a.lastVisit||''));
+  const filtered = all.filter(c => clientMatchesQuery(c, clientsView.query));
+  countEl.textContent = clientsView.query.trim()
+    ? `Найдено: ${filtered.length} из ${all.length}`
+    : `Всего клиентов: ${all.length}`;
 
-  const today = todayKey();
+  if (filtered.length === 0){
+    container.innerHTML = '<div class="empty-state">Никого не нашли — проверьте имя или номер</div>';
+    return;
+  }
+
   container.innerHTML = '';
-  list.forEach(client => {
-    const daysSince = Math.floor((new Date(today) - new Date(client.lastVisit + 'T00:00:00')) / 86400000);
-    let statusLabel = '';
-    if (client.visits >= 3) statusLabel = '<span class="client-badge badge-regular">Постоянный</span>';
-    else if (client.visits === 1) statusLabel = '<span class="client-badge badge-new">Новый</span>';
-    if (daysSince > 30) statusLabel += '<span class="client-badge badge-sleeping">Давно не был</span>';
+  filtered.forEach(client => container.appendChild(buildClientCard(client)));
+}
 
-    const card = document.createElement('div');
-    card.className = 'booking-card client-card';
-    card.innerHTML = `
-      <div class="booking-top">
-        <span class="booking-date">${escapeHtml(client.name)}</span>
-        <span>${statusLabel}</span>
-      </div>
-      <div class="booking-client">${escapeHtml(client.phone)}</div>
-      <div class="client-stats">
-        <span>Визитов: <b>${client.visits}</b></span>
-        <span>Потрачено: <b>${(client.totalSpent||0).toLocaleString('ru-RU')} ₽</b></span>
-        <span>Последний: <b>${client.lastVisit || '—'}</b></span>
-      </div>
-      <div class="notes-block">
-        <textarea class="notes-input" placeholder="Заметки (особенности, предпочтения...)" data-phone="${escapeHtml(client.phone)}">${escapeHtml(client.notes||'')}</textarea>
-        <button class="save-note-btn" data-phone="${escapeHtml(client.phone)}">Сохранить заметку</button>
-        <div class="save-status note-status" data-note-status="${escapeHtml(client.phone)}"></div>
-      </div>
-    `;
-    card.querySelector('.save-note-btn').addEventListener('click', async (e) => {
-      const phone = e.target.dataset.phone;
-      const notes = card.querySelector(`.notes-input[data-phone="${phone}"]`).value;
-      const status = card.querySelector(`[data-note-status="${phone}"]`);
-      e.target.disabled = true;
-      try{
-        await withTimeout(Store.saveClientNote(phone, notes), 8000);
-        status.textContent = '✓ Сохранено';
-        status.style.color = 'var(--good)';
-        setTimeout(()=>{ status.textContent=''; }, 2000);
-      }catch(err){
-        status.textContent = 'Ошибка сохранения';
-        status.style.color = '#B07E7E';
-      }
-      e.target.disabled = false;
-    });
-    container.appendChild(card);
+function buildVisitsListHtml(visits){
+  if (visits.length === 0){
+    return '<div class="empty-state" style="padding:12px 0;">В истории нет записей по этому номеру</div>';
+  }
+  return visits.map(h => {
+    const d = new Date(h.date + 'T00:00:00');
+    const dateStr = d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const dow = d.toLocaleDateString('ru-RU', { weekday:'short' });
+    const isNoShow = h.status === 'no_show';
+    const service = disambiguateServiceName(h.serviceName, h.serviceDuration);
+    const price = isNoShow
+      ? '<span class="visit-noshow-tag">не пришёл</span>'
+      : `${(h.servicePrice||0).toLocaleString('ru-RU')} ₽`;
+    return `
+      <div class="visit-row${isNoShow ? ' noshow' : ''}">
+        <div class="visit-when">${escapeHtml(dateStr)}<small>${escapeHtml(dow)}, ${escapeHtml(h.start||'')}</small></div>
+        <div class="visit-what"><b>${escapeHtml(service)}</b><br>${price}</div>
+      </div>`;
+  }).join('');
+}
+
+function buildClientCard(client){
+  const today = todayKey();
+  const key = phoneTail10(client.phone);
+  const visits = clientsView.historyByPhone[key] || [];
+  const noShows = visits.filter(h => h.status === 'no_show').length;
+  const isOpen = clientsView.openedVisits.has(key);
+
+  const daysSince = Math.floor((new Date(today) - new Date(client.lastVisit + 'T00:00:00')) / 86400000);
+  let statusLabel = '';
+  if (client.visits >= 3) statusLabel = '<span class="client-badge badge-regular">Постоянный</span>';
+  else if (client.visits === 1) statusLabel = '<span class="client-badge badge-new">Новый</span>';
+  if (daysSince > 30) statusLabel += '<span class="client-badge badge-sleeping">Давно не был</span>';
+
+  const noteValue = clientsView.noteDrafts.has(key) ? clientsView.noteDrafts.get(key) : (client.notes || '');
+  const toggleLabel = `Все посещения (${visits.length})` + (noShows ? ` · неявок: ${noShows}` : '');
+
+  const card = document.createElement('div');
+  card.className = 'booking-card client-card';
+  card.innerHTML = `
+    <div class="booking-top">
+      <span class="booking-date">${escapeHtml(client.name)}</span>
+      <span>${statusLabel}</span>
+    </div>
+    ${clientLine(null, client.phone)}
+    <div class="client-stats">
+      <span>Визитов: <b>${client.visits}</b></span>
+      <span>Потрачено: <b>${(client.totalSpent||0).toLocaleString('ru-RU')} ₽</b></span>
+      <span>Последний: <b>${escapeHtml(client.lastVisit || '—')}</b></span>
+    </div>
+    <button type="button" class="visits-toggle">
+      <span>${toggleLabel}</span>
+      <span class="visits-chev${isOpen ? ' open' : ''}">▾</span>
+    </button>
+    <div class="visits-list${isOpen ? '' : ' hidden'}">${isOpen ? buildVisitsListHtml(visits) : ''}</div>
+    <div class="notes-block">
+      <textarea class="notes-input" placeholder="Заметки (особенности, предпочтения...)">${escapeHtml(noteValue)}</textarea>
+      <button class="save-note-btn" type="button">Сохранить заметку</button>
+      <div class="save-status note-status"></div>
+    </div>
+  `;
+
+  // Раскрытие списка посещений. Разметку строим лениво — при первом открытии.
+  const toggleBtn = card.querySelector('.visits-toggle');
+  const listEl = card.querySelector('.visits-list');
+  const chev = card.querySelector('.visits-chev');
+  toggleBtn.addEventListener('click', () => {
+    const nowOpen = listEl.classList.contains('hidden');
+    if (nowOpen){
+      if (!listEl.innerHTML.trim()) listEl.innerHTML = buildVisitsListHtml(visits);
+      clientsView.openedVisits.add(key);
+    } else {
+      clientsView.openedVisits.delete(key);
+    }
+    listEl.classList.toggle('hidden', !nowOpen);
+    chev.classList.toggle('open', nowOpen);
+  });
+
+  // Заметки: черновик держим в памяти, пока не сохранили — иначе ввод в поиск
+  // перерисовал бы карточку и недописанная заметка пропала бы.
+  const notesInput = card.querySelector('.notes-input');
+  const saveBtn = card.querySelector('.save-note-btn');
+  const status = card.querySelector('.note-status');
+  notesInput.addEventListener('input', () => clientsView.noteDrafts.set(key, notesInput.value));
+
+  saveBtn.addEventListener('click', async () => {
+    const notes = notesInput.value;
+    saveBtn.disabled = true;
+    try{
+      await withTimeout(Store.saveClientNote(client.phone, notes), 8000);
+      client.notes = notes;               // обновляем кэш, чтобы после поиска была свежая версия
+      clientsView.noteDrafts.delete(key);
+      status.textContent = '✓ Сохранено';
+      status.style.color = 'var(--good)';
+      setTimeout(()=>{ status.textContent=''; }, 2000);
+    }catch(err){
+      status.textContent = 'Ошибка сохранения';
+      status.style.color = '#B07E7E';
+    }
+    saveBtn.disabled = false;
+  });
+
+  return card;
+}
+
+// Поле поиска живёт в статичной разметке вкладки (не внутри списка), поэтому
+// при фильтрации фокус и курсор не сбрасываются. Подключается один раз.
+function setupClientsSearch(){
+  const input = document.getElementById('clientsSearch');
+  const clearBtn = document.getElementById('clientsSearchClear');
+  let timer = null;
+
+  const apply = () => {
+    clientsView.query = input.value;
+    clearBtn.classList.toggle('hidden', !input.value);
+    renderClientsList();
+  };
+
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(apply, 150); // небольшая задержка — не перерисовываем на каждую букву
+  });
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    apply();
+    input.focus();
   });
 }
 
@@ -1844,6 +2056,7 @@ async function initAdminContent(){
   });
   document.getElementById('saveSchedule').addEventListener('click', saveScheduleHandler);
   setupAdminTabs();
+  setupClientsSearch();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
