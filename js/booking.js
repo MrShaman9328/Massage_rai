@@ -757,6 +757,9 @@ function showConfirmation(booking){
     <div class="row"><span>Телефон</span><span>${escapeHtml(booking.clientPhone)}</span></div>
   `;
   document.getElementById('telegramReminderBtn').href = `https://t.me/rai_massage_bot?start=${booking.id}`;
+  // Ник бота MAX задаётся платформой и не меняется. Сверить с выводом
+  // «node server.js job check-max» на сервере — он печатает точную ссылку.
+  document.getElementById('maxReminderBtn').href = `https://max.ru/se14709110_bot?start=${booking.id}`;
   clientState.lastBookingId = booking.id;
   goToStep(4);
 }

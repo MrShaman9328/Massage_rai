@@ -251,6 +251,14 @@
   }
   .btn-telegram:hover{ filter:brightness(1.06); }
   .btn-telegram:active{ transform:scale(0.98); }
+  .btn-max{
+    display:block; text-align:center; text-decoration:none;
+    background: linear-gradient(135deg, #7B5CF5, #4F7BF7);
+    color:#fff;
+    box-shadow: 0 14px 30px -10px rgba(91,110,245,0.55);
+  }
+  .btn-max:hover{ filter:brightness(1.06); }
+  .btn-max:active{ transform:scale(0.98); }
   .btn-row{ display:flex; gap:10px; margin-top:6px; }
 
   /* ---------- Calendar ---------- */
