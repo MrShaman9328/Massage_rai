@@ -1,7 +1,7 @@
-// Каталога услуг здесь нет намеренно: админка показывает название, цену и
-// длительность из самой брони — то, что клиент выбрал в момент записи.
-// Единственный каталог — в js/booking.js. Раньше тут лежала его устаревшая
-// копия, которая нигде не использовалась и расходилась с сайтом по ценам.
+// Каталог услуг — общий, в js/services.js (подключается до этого файла).
+// Здесь он нужен только форме «Записать клиента»; карточки записей
+// показывают название, цену и длительность из самой брони — то, что было
+// выбрано в момент записи, даже если прайс с тех пор поменялся.
 
 // Различаем "Классический массаж" тела (60/90 мин) и лица (30 мин) —
 // в каталоге имя специально одинаковое, отличаем по длительности.
@@ -170,8 +170,16 @@ const Store = {
     // kept as a no-op for compatibility with existing call sites.
   },
 
-  async saveNewBooking(booking){
-    await callApi('createBooking', { booking });
+  // Не через callApi: на 409 сервер присылает список пересечений, и он нужен
+  // форме целиком, а callApi оставляет от ответа только код ошибки.
+  async createMasterBooking(payload){
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'createMasterBooking', adminPassword: currentAdminPassword, ...payload })
+    });
+    const data = await res.json().catch(() => ({}));
+    return { status: res.status, data };
   },
 
   async deleteBooking(bookingId, options){
@@ -485,6 +493,7 @@ function renderBookingsList(){
   const lastSeen = Store.lastSeenAt ? new Date(Store.lastSeenAt).getTime() : 0;
   const isNew = (b) => {
     if (!b.createdAt) return false;
+    if (b.source === 'master') return false; // свою же запись Дарья уже видела
     return new Date(b.createdAt).getTime() > lastSeen;
   };
   // Запись считается изменённой (перенесённой клиентом), если перенос
@@ -529,20 +538,29 @@ function renderBookingsList(){
     const d = new Date(b.date + 'T00:00:00');
     const dateStr = d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
 
+    const isReserve = b.kind === 'reserve';
+    const badges =
+      (isNew(b) ? ' <span class="new-badge">НОВАЯ</span>' : '') +
+      (isChanged(b) ? ' <span class="changed-badge">ИЗМЕНЕНА</span>' : '') +
+      (b.source === 'master' && !isReserve ? ' <span class="master-badge">САМА</span>' : '') +
+      (isOutsideSchedule(b.date, b.start, b.end) ? ' <span class="offschedule-badge">ВНЕ ГРАФИКА</span>' : '');
+
     const card = document.createElement('div');
-    card.className = 'booking-card' + (isNew(b) ? ' booking-new' : '');
+    card.className = 'booking-card' + (isNew(b) ? ' booking-new' : '') + (isReserve ? ' booking-reserve' : '');
     card.innerHTML = `
       <div class="booking-top">
-        <span class="booking-date">${dateStr}${isNew(b) ? ' <span class="new-badge">НОВАЯ</span>' : ''}${isChanged(b) ? ' <span class="changed-badge">ИЗМЕНЕНА</span>' : ''}</span>
+        <span class="booking-date">${dateStr}${badges}</span>
         <span class="booking-time">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span>
       </div>
-      <div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
-      ${clientLine(b.clientName, b.clientPhone)}
+      ${isReserve
+        ? `<div class="booking-service">🔒 Резерв — время занято</div>`
+        : `<div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
+      ${clientLine(b.clientName, b.clientPhone)}`}
       ${b.comment ? `<div class="booking-comment">💬 ${escapeHtml(b.comment)}</div>` : ''}
       ${b.clientNotes ? `<div class="booking-comment client-note">📌 ${escapeHtml(b.clientNotes)}</div>` : ''}
       <div class="booking-actions">
         <button class="edit-booking-btn" data-booking-id="${escapeHtml(b.id)}">Изменить время</button>
-        <button class="cancel-booking-btn" data-booking-id="${escapeHtml(b.id)}">Отменить запись</button>
+        <button class="cancel-booking-btn" data-booking-id="${escapeHtml(b.id)}">${isReserve ? 'Снять резерв' : 'Отменить запись'}</button>
       </div>
       <div class="edit-form hidden" data-edit-for="${escapeHtml(b.id)}">
         <div class="edit-row">
@@ -748,6 +766,38 @@ function buildWaitingCard(b){
   const dateStr = d.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'short' });
   const card = document.createElement('div');
   card.className = 'booking-card waiting-card';
+
+  // Прошедший резерв — не визит: «пришёл/не пришёл» к нему не относится,
+  // а в истории он считался бы визитом на 0 ₽. Просто убираем.
+  if (b.kind === 'reserve'){
+    card.classList.add('booking-reserve');
+    card.innerHTML = `
+      <div class="booking-top">
+        <span class="booking-date">${dateStr}</span>
+        <span class="booking-time">${escapeHtml(b.start)}–${escapeHtml(b.end)}</span>
+      </div>
+      <div class="booking-service">🔒 Резерв — время занято</div>
+      ${b.comment ? `<div class="booking-comment">💬 ${escapeHtml(b.comment)}</div>` : ''}
+      <div class="mark-actions">
+        <button class="mark-btn remove-reserve-btn">Убрать резерв</button>
+      </div>
+    `;
+    const btn = card.querySelector('.remove-reserve-btn');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      try{
+        await withTimeout(Store.deleteBooking(b.id), 8000);
+        const idx = Store.bookings.findIndex(x => x.id === b.id);
+        if (idx !== -1) Store.bookings.splice(idx, 1);
+        renderHistoryTab();
+      }catch(e){
+        alert('Не удалось убрать резерв. Попробуйте снова.');
+        btn.disabled = false;
+      }
+    });
+    return card;
+  }
+
   card.innerHTML = `
     <div class="booking-top">
       <span class="booking-date">${dateStr}</span>
@@ -1253,6 +1303,399 @@ async function checkPassword(){
 }
 
 // ============================================================
+// ЗАПИСЬ ОТ МАСТЕРА («Записать клиента / занять время»)
+// ============================================================
+// Дарья записывает постоянного клиента или просто занимает время — на любое
+// время, в том числе закрытое в графике. Сервер график не проверяет, а сайт
+// вычитает все брони из открытых часов: когда Дарья откроет этот день, время
+// уже будет занято. Серверная сторона — createMasterBooking в index.js.
+
+const SLOT_BUFFER_MIN = 15; // тот же зазор между визитами, что на сервере и сайте
+
+// true — если время не лежит целиком внутри одного из открытых интервалов дня.
+function isOutsideSchedule(date, start, end){
+  const intervals = Store.schedule[date];
+  if (!Array.isArray(intervals) || intervals.length === 0) return true;
+  const s = timeToMinutes(start);
+  const e = timeToMinutes(end);
+  return !intervals.some(i => i.start && i.end && timeToMinutes(i.start) <= s && e <= timeToMinutes(i.end));
+}
+
+function findLocalConflicts(date, start, end, excludeId){
+  const s = timeToMinutes(start) - SLOT_BUFFER_MIN;
+  const e = timeToMinutes(end) + SLOT_BUFFER_MIN;
+  return Store.bookings.filter(b =>
+    b.id !== excludeId && b.date === date && s < timeToMinutes(b.end) && e > timeToMinutes(b.start));
+}
+
+function describeConflict(c){
+  const who = (c.kind === 'reserve' || c.clientName === 'Резерв') ? 'резерв' : (c.clientName || '');
+  return `${c.start}–${c.end} ${who}`.trim();
+}
+
+// Телефон из любого вида ввода → 11 цифр с 7 впереди. Номер «918…» без кода
+// страны тоже принимаем: Дарья набирает так, как привыкла.
+function normalizePhoneInput(raw){
+  let d = String(raw || '').replace(/\D/g, '');
+  if (d.length === 10 && d[0] === '9') d = '7' + d;
+  if (d.length === 11 && d[0] === '8') d = '7' + d.slice(1);
+  return d;
+}
+
+function formatPhoneDisplay(d){
+  return `+7 (${d.slice(1,4)}) ${d.slice(4,7)}-${d.slice(7,9)}-${d.slice(9,11)}`;
+}
+
+const masterForm = {
+  directory: null,   // [{ name, phone, tail, hasMessenger, when }] — для подсказок
+  reserve: false,
+  pendingId: null,   // id живёт до успеха: повтор после сбоя/подтверждения не создаст дубль
+};
+
+// Справочник для подсказок: карточки клиентов (все, кто хоть раз пришёл) +
+// предстоящие брони (новенькие, у кого карточки ещё нет). По номеру
+// оставляем самое свежее имя.
+async function loadClientDirectory(){
+  const byTail = new Map();
+  const add = (name, phone, hasMessenger, when) => {
+    const tail = phoneTail10(phone);
+    if (tail.length !== 10 || !name) return;
+    const prev = byTail.get(tail);
+    if (!prev || String(when) > String(prev.when)){
+      byTail.set(tail, { name, phone, tail, hasMessenger: hasMessenger || !!(prev && prev.hasMessenger), when });
+    } else if (hasMessenger){
+      prev.hasMessenger = true;
+    }
+  };
+
+  let clients = {};
+  try{ clients = await withTimeout(Store.getClients(), 8000); }
+  catch(e){ console.error('loadClientDirectory:', e); }
+  Object.values(clients).forEach(c => add(c.name, c.phone, !!(c.maxUserId || c.chatId), c.lastVisit || ''));
+  Store.bookings.forEach(b => {
+    if (b.kind === 'reserve') return;
+    add(b.clientName, b.clientPhone, !!(b.clientMaxUserId || b.clientChatId), b.createdAt || b.date);
+  });
+  masterForm.directory = [...byTail.values()];
+}
+
+// Поиск: от трёх цифр — по телефону (с 7 или 8 впереди — неважно), от двух
+// букв — по имени (регистр и ё/е не важны).
+function searchDirectory(query){
+  const list = masterForm.directory || [];
+  const q = String(query || '').trim();
+  const digits = q.replace(/\D/g, '');
+  const letters = normName(q.replace(/[\d+()\-\s]+/g, ' '));
+  let found = [];
+  if (digits.length >= 3){
+    found = list.filter(c => ('7' + c.tail).includes(digits) || ('8' + c.tail).includes(digits));
+  } else if (letters.replace(/\s/g, '').length >= 2){
+    found = list.filter(c => normName(c.name).includes(letters));
+  }
+  return found.sort((a, b) => String(b.when).localeCompare(String(a.when))).slice(0, 6);
+}
+
+function serviceOptionsHtml(){
+  const groups = SERVICE_CATEGORIES.map(cat => `
+    <optgroup label="${escapeHtml(cat.category)}">
+      ${cat.services.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} · ${formatDuration(s.duration)} · ${s.price.toLocaleString('ru-RU')} ₽</option>`).join('')}
+    </optgroup>`).join('');
+  return `<option value="">Выберите услугу</option>${groups}<option value="custom">Другое — указать вручную</option>`;
+}
+
+function renderMasterBookingForm(){
+  const box = document.getElementById('masterBookingForm');
+  box.innerHTML = `
+    <div class="segmented">
+      <button type="button" data-mode="client" class="active">Клиент</button>
+      <button type="button" data-mode="reserve">Просто занять время</button>
+    </div>
+
+    <div class="mf-client-only">
+      <div class="field mf-search-field">
+        <label for="mfSearch">Найти в базе</label>
+        <input type="search" id="mfSearch" placeholder="Несколько цифр телефона или имя" autocomplete="off">
+        <div class="suggestions hidden" id="mfSuggestions"></div>
+      </div>
+      <div class="mf-row">
+        <div class="field"><label for="mfName">Имя</label><input id="mfName" maxlength="100" autocomplete="off"></div>
+        <div class="field"><label for="mfPhone">Телефон</label><input id="mfPhone" type="tel" placeholder="+7 900 000-00-00" autocomplete="off"></div>
+      </div>
+      <div class="field">
+        <label for="mfService">Услуга</label>
+        <select id="mfService">${serviceOptionsHtml()}</select>
+      </div>
+      <div class="field mf-custom hidden"><label for="mfServiceName">Название услуги</label><input id="mfServiceName" maxlength="200"></div>
+      <div class="mf-row">
+        <div class="field"><label for="mfDuration">Длительность, мин</label><input id="mfDuration" type="number" min="5" max="600" step="5" inputmode="numeric"></div>
+        <div class="field"><label for="mfPrice">Цена, ₽</label><input id="mfPrice" type="number" min="0" max="100000" step="50" inputmode="numeric"></div>
+      </div>
+    </div>
+
+    <div class="mf-row">
+      <div class="field"><label for="mfDate">Дата</label><input id="mfDate" type="date" value="${todayKey()}"></div>
+      <div class="field"><label for="mfStart">Начало</label><input id="mfStart" type="time" step="300"></div>
+      <div class="field mf-reserve-only hidden"><label for="mfEnd">До</label><input id="mfEnd" type="time" step="300"></div>
+    </div>
+
+    <div class="field"><label for="mfComment">Комментарий</label><input id="mfComment" maxlength="500" placeholder="Необязательно"></div>
+
+    <label class="mf-check mf-client-only"><input type="checkbox" id="mfNotify" checked> Сообщить клиенту в MAX / Telegram (если подключён)</label>
+
+    <div class="mf-info" id="mfInfo"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="mfSubmit" type="button">Записать</button>
+      <button class="btn btn-ghost" id="mfCancel" type="button">Отмена</button>
+    </div>
+    <div class="save-status" id="mfStatus"></div>
+  `;
+
+  const $ = (id) => document.getElementById(id);
+
+  box.querySelectorAll('.segmented button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      masterForm.reserve = btn.dataset.mode === 'reserve';
+      box.querySelectorAll('.segmented button').forEach(b => b.classList.toggle('active', b === btn));
+      box.querySelectorAll('.mf-client-only').forEach(el => el.classList.toggle('hidden', masterForm.reserve));
+      box.querySelectorAll('.mf-reserve-only').forEach(el => el.classList.toggle('hidden', !masterForm.reserve));
+      $('mfSubmit').textContent = masterForm.reserve ? 'Занять время' : 'Записать';
+      updateMasterFormInfo();
+    });
+  });
+
+  // Подсказки из базы
+  const search = $('mfSearch');
+  const sugg = $('mfSuggestions');
+  const showSuggestions = () => {
+    const found = searchDirectory(search.value);
+    if (!found.length){
+      sugg.innerHTML = search.value.trim().length >= 2 ? '<div class="suggestion-empty">В базе не нашлось — заполните имя и телефон ниже</div>' : '';
+      sugg.classList.toggle('hidden', !sugg.innerHTML);
+      return;
+    }
+    sugg.innerHTML = found.map((c, i) => `
+      <button type="button" class="suggestion-item" data-idx="${i}">
+        <span class="suggestion-name">${escapeHtml(c.name)}</span>
+        <span class="suggestion-phone">${escapeHtml(c.phone)}${c.hasMessenger ? ' · 💬' : ''}</span>
+      </button>`).join('');
+    sugg.classList.remove('hidden');
+    sugg.querySelectorAll('.suggestion-item').forEach(item => {
+      // mousedown, а не click: иначе blur поля спрячет список раньше, чем сработает выбор
+      item.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        const c = found[Number(item.dataset.idx)];
+        $('mfName').value = c.name;
+        $('mfPhone').value = c.phone;
+        search.value = '';
+        sugg.classList.add('hidden');
+        updateMasterFormInfo();
+      });
+    });
+  };
+  search.addEventListener('input', showSuggestions);
+  search.addEventListener('focus', showSuggestions);
+  search.addEventListener('blur', () => setTimeout(() => sugg.classList.add('hidden'), 150));
+  search.addEventListener('keydown', (e) => { if (e.key === 'Escape') sugg.classList.add('hidden'); });
+
+  $('mfService').addEventListener('change', () => {
+    const val = $('mfService').value;
+    $('mfServiceName').closest('.field').classList.toggle('hidden', val !== 'custom');
+    const svc = val && val !== 'custom' ? getServiceById(val) : null;
+    if (svc){
+      $('mfDuration').value = svc.duration;
+      $('mfPrice').value = svc.price;
+    }
+    updateMasterFormInfo();
+  });
+
+  ['mfName', 'mfPhone', 'mfDuration', 'mfDate', 'mfStart', 'mfEnd'].forEach(id => {
+    $(id).addEventListener('input', updateMasterFormInfo);
+    $(id).addEventListener('change', updateMasterFormInfo);
+  });
+
+  $('mfSubmit').addEventListener('click', () => submitMasterBooking(false));
+  $('mfCancel').addEventListener('click', closeMasterBookingForm);
+}
+
+// Время окончания из формы: у клиента — начало + длительность услуги,
+// у резерва — поле «До». null — если данных пока не хватает.
+function masterFormTimes(){
+  const $ = (id) => document.getElementById(id);
+  const date = $('mfDate').value;
+  const start = $('mfStart').value;
+  if (!date || !start) return null;
+  let end;
+  if (masterForm.reserve){
+    end = $('mfEnd').value;
+    if (!end || timeToMinutes(end) <= timeToMinutes(start)) return { date, start, end: null };
+  } else {
+    const dur = Number($('mfDuration').value);
+    if (!Number.isFinite(dur) || dur < 5) return { date, start, end: null };
+    const endMin = timeToMinutes(start) + dur;
+    if (endMin >= 24 * 60) return { date, start, end: null };
+    end = minutesToTime(endMin);
+  }
+  return { date, start, end };
+}
+
+// Живые подсказки под формой: до кнопки «Записать» Дарья видит, что будет.
+function updateMasterFormInfo(){
+  const info = document.getElementById('mfInfo');
+  if (!info) return;
+  const lines = [];
+  const t = masterFormTimes();
+
+  if (t && t.end){
+    lines.push(`<div>🕐 ${escapeHtml(t.start)}–${escapeHtml(t.end)}</div>`);
+    if (isOutsideSchedule(t.date, t.start, t.end)){
+      lines.push(`<div class="mf-note">🔒 Время закрыто в графике — клиенты его не видят. Когда откроете этот день, оно уже будет занято.</div>`);
+    }
+    const conflicts = findLocalConflicts(t.date, t.start, t.end);
+    if (conflicts.length){
+      lines.push(`<div class="mf-warn">⚠️ Пересекается (с учётом 15 минут между визитами): ${conflicts.map(c => escapeHtml(describeConflict(c))).join(', ')}</div>`);
+    }
+    const startsAt = new Date(`${t.date}T${t.start}:00`);
+    if (startsAt.getTime() < Date.now()){
+      lines.push(`<div class="mf-warn">⚠️ Это время уже прошло</div>`);
+    }
+  }
+
+  if (!masterForm.reserve){
+    const phone = normalizePhoneInput(document.getElementById('mfPhone').value);
+    if (phone.length === 11 && masterForm.directory){
+      const known = masterForm.directory.find(c => c.tail === phone.slice(-10));
+      if (known && known.hasMessenger){
+        lines.push(`<div class="mf-note">💬 У клиента подключён MAX или Telegram — сообщение о записи и напоминание придут автоматически.</div>`);
+      } else if (known){
+        lines.push(`<div class="mf-note">У клиента не подключены MAX и Telegram — о записи и напоминании сообщите сами.</div>`);
+      }
+    }
+  }
+
+  info.innerHTML = lines.join('');
+}
+
+const MASTER_FIELD_NAMES = {
+  clientName: 'имя', clientPhone: 'телефон', serviceName: 'услуга', servicePrice: 'цена',
+  serviceDuration: 'длительность', date: 'дата', start: 'время начала', end: 'время окончания', comment: 'комментарий',
+};
+
+async function submitMasterBooking(force){
+  const $ = (id) => document.getElementById(id);
+  const status = $('mfStatus');
+  const btn = $('mfSubmit');
+  const fail = (msg) => { status.textContent = msg; status.style.color = '#B07E7E'; };
+  status.textContent = '';
+
+  // Услугу — раньше времени: длительность берётся из неё, и без услуги
+  // ошибка «укажите длительность» сбивала бы с толку.
+  if (!masterForm.reserve && !$('mfService').value) return fail('Выберите услугу');
+  const t = masterFormTimes();
+  if (!t) return fail('Укажите дату и время начала');
+  if (!t.end) return fail(masterForm.reserve ? 'Укажите, до какого времени занять' : 'Укажите длительность (время не должно переходить за полночь)');
+
+  const booking = {
+    id: masterForm.pendingId || (masterForm.pendingId = (crypto.randomUUID ? crypto.randomUUID() : `m${Date.now()}${Math.random().toString(36).slice(2, 10)}`)),
+    date: t.date, start: t.start, end: t.end,
+    comment: $('mfComment').value.trim(),
+  };
+
+  if (!masterForm.reserve){
+    const name = $('mfName').value.trim();
+    const phone = normalizePhoneInput($('mfPhone').value);
+    const svcId = $('mfService').value;
+    const svc = svcId && svcId !== 'custom' ? getServiceById(svcId) : null;
+    const serviceName = svcId === 'custom' ? $('mfServiceName').value.trim() : (svc ? svc.name : '');
+    if (name.length < 2) return fail('Укажите имя клиента');
+    if (phone.length !== 11 || phone[1] !== '9') return fail('Телефон — мобильный, 11 цифр (+7 9…)');
+    if (!serviceName) return fail('Выберите услугу');
+    Object.assign(booking, {
+      clientName: name,
+      clientPhone: formatPhoneDisplay(phone),
+      serviceName,
+      serviceDuration: Number($('mfDuration').value),
+      servicePrice: Number($('mfPrice').value) || 0,
+    });
+  }
+
+  const notifyClient = !masterForm.reserve && $('mfNotify').checked;
+  btn.disabled = true;
+  btn.textContent = 'Сохраняем...';
+  const resetBtn = () => { btn.disabled = false; btn.textContent = masterForm.reserve ? 'Занять время' : 'Записать'; };
+
+  let result;
+  try{
+    result = await withTimeout(Store.createMasterBooking({ booking, reserve: masterForm.reserve, force, notifyClient }), 12000);
+  }catch(e){
+    resetBtn();
+    return fail('Сервер не отвечает — попробуйте ещё раз (повтор не создаст дубль)');
+  }
+
+  const { status: code, data } = result;
+  if (code === 409 && data.conflicts){
+    const list = data.conflicts.map(describeConflict).join('\n');
+    resetBtn();
+    if (confirm(`Время пересекается с другими записями (с учётом 15 минут между визитами):\n${list}\n\nЗаписать всё равно?`)){
+      return submitMasterBooking(true);
+    }
+    return;
+  }
+  if (code === 401){
+    resetBtn();
+    return fail('Сессия истекла — обновите страницу и войдите снова');
+  }
+  if (code !== 200 || !data.booking){
+    resetBtn();
+    const field = data && data.field ? ` (${MASTER_FIELD_NAMES[data.field] || data.field})` : '';
+    return fail(`Не удалось записать: проверьте поля${field}`);
+  }
+
+  // Успех
+  if (!Store.bookings.some(b => b.id === data.booking.id)){
+    Store.bookings.push({ ...data.booking, clientNotes: '' });
+  }
+  const parts = [masterForm.reserve ? '✓ Время занято' : '✓ Записано'];
+  if (!masterForm.reserve && notifyClient){
+    if (data.clientNotified === 'max') parts.push('клиенту отправлено в MAX');
+    else if (data.clientNotified === 'telegram') parts.push('клиенту отправлено в Telegram');
+    else if (data.clientHasMessenger) parts.push('сообщение клиенту не дошло — сообщите сами');
+    else parts.push('мессенджер у клиента не подключён — сообщите сами');
+  }
+  closeMasterBookingForm();
+  const resultEl = $('masterBookingResult');
+  resultEl.style.color = 'var(--good)';
+  resultEl.textContent = parts.join(' · ');
+  setTimeout(() => { if (resultEl.textContent === parts.join(' · ')) resultEl.textContent = ''; }, 10000);
+  renderBookingsList();
+}
+
+async function openMasterBookingForm(){
+  const box = document.getElementById('masterBookingForm');
+  document.getElementById('masterBookingResult').textContent = '';
+  masterForm.reserve = false;
+  masterForm.pendingId = null;
+  renderMasterBookingForm();
+  box.classList.remove('hidden');
+  document.getElementById('masterBookingOpen').classList.add('hidden');
+  // Справочник грузим при каждом открытии: брони и карточки могли измениться.
+  await loadClientDirectory();
+  updateMasterFormInfo();
+}
+
+function closeMasterBookingForm(){
+  const box = document.getElementById('masterBookingForm');
+  box.classList.add('hidden');
+  box.innerHTML = '';
+  masterForm.pendingId = null;
+  document.getElementById('masterBookingOpen').classList.remove('hidden');
+}
+
+function setupMasterBooking(){
+  document.getElementById('masterBookingOpen').addEventListener('click', openMasterBookingForm);
+}
+
+// ============================================================
 // INIT — админ-страница
 // ============================================================
 async function initAdminContent(){
@@ -1269,6 +1712,7 @@ async function initAdminContent(){
   document.getElementById('saveSchedule').addEventListener('click', saveScheduleHandler);
   setupAdminTabs();
   setupClientsSearch();
+  setupMasterBooking();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

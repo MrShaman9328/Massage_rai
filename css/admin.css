@@ -465,6 +465,70 @@
 
   .hidden{ display:none !important; }
 
+  /* --- Запись от мастера --- */
+  .master-badge, .offschedule-badge{
+    display:inline-block;
+    color:#fff;
+    font-size:9.5px;
+    font-weight:700;
+    letter-spacing:0.04em;
+    padding:2px 7px;
+    border-radius:20px;
+    vertical-align:middle;
+    margin-left:6px;
+  }
+  .master-badge{ background:var(--rose); }
+  .offschedule-badge{ background:#8A8FA8; }
+  .booking-card.booking-reserve{ border-style:dashed; background:transparent; }
+  .remove-reserve-btn{ color:var(--ink-soft); }
+
+  .master-form{
+    border:1.5px solid var(--line);
+    border-radius:16px;
+    padding:16px;
+    margin:10px 0 18px;
+    background:var(--bg-soft);
+  }
+  .segmented{ display:flex; gap:6px; background:var(--bg); padding:4px; border-radius:12px; margin-bottom:16px; }
+  .segmented button{
+    flex:1; padding:10px 8px; border:none; border-radius:9px; background:transparent;
+    font-family:'Manrope'; font-weight:700; font-size:13px; color:var(--ink-soft); cursor:pointer;
+  }
+  .segmented button.active{ background:var(--card); color:var(--ink); box-shadow:0 2px 8px -4px rgba(58,44,41,0.3); }
+
+  .mf-row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .mf-row .field{ flex:1 1 120px; min-width:0; }
+  .master-form .field input, .master-form .field select{
+    width:100%; padding:12px 14px; border-radius:12px; border:1.5px solid var(--line);
+    font-family:'Manrope'; font-size:15px; background:var(--card); color:var(--ink);
+  }
+  .master-form .field select{ appearance:auto; }
+  .master-form .field input:focus, .master-form .field select:focus{ outline:none; border-color:var(--rose-deep); }
+
+  .mf-search-field{ position:relative; }
+  .suggestions{
+    position:absolute; left:0; right:0; top:100%; z-index:5; margin-top:4px;
+    background:var(--card); border:1.5px solid var(--line); border-radius:12px;
+    box-shadow:var(--shadow); overflow:hidden;
+  }
+  .suggestion-item{
+    display:flex; justify-content:space-between; gap:10px; width:100%; padding:11px 14px;
+    border:none; border-bottom:1px solid var(--line); background:transparent; cursor:pointer;
+    font-family:'Manrope'; font-size:14px; text-align:left; color:var(--ink);
+  }
+  .suggestion-item:last-child{ border-bottom:none; }
+  .suggestion-item:hover{ background:rgba(201,154,154,0.12); }
+  .suggestion-name{ font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .suggestion-phone{ color:var(--ink-soft); white-space:nowrap; }
+  .suggestion-empty{ padding:11px 14px; font-size:13px; color:var(--ink-soft); }
+
+  .mf-check{ display:flex; align-items:flex-start; gap:8px; font-size:13.5px; color:var(--ink); margin:2px 0 12px; cursor:pointer; line-height:1.4; }
+  .mf-check input{ margin-top:2px; accent-color:var(--rose-deep); }
+  .mf-info{ font-size:13px; line-height:1.5; color:var(--ink); margin-bottom:12px; }
+  .mf-info > div{ margin-bottom:6px; }
+  .mf-note{ color:var(--ink-soft); }
+  .mf-warn{ color:#A05A3C; font-weight:600; }
+
   /* --- История --- */
   .history-section-title{
     font-family:'Marcellus', serif;
