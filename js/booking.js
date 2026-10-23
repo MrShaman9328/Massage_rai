@@ -107,9 +107,6 @@ const Store = {
     return await callApi('rescheduleBookingByPhone', { phone, id, newStart });
   },
 
-  async submitPackageLead(id, clientName, clientPhone, packageTier, hp){
-    return await callApi('submitPackageLead', { id, clientName, clientPhone, packageTier, hp });
-  },
 };
 
 function withTimeout(promise, ms){
@@ -214,7 +211,7 @@ function buildServiceCardElement(svc){
 function renderServices(){
   const container = document.getElementById('servicesList');
   container.innerHTML = '';
-  SERVICE_CATEGORIES.filter(cat => !cat.hidden).forEach(cat => {
+  SERVICE_CATEGORIES.forEach(cat => {
     const label = document.createElement('div');
     label.className = 'category-label';
     label.textContent = cat.category;
@@ -233,23 +230,6 @@ function renderServices(){
   });
   updateServicesFooter();
 }
-
-// Отдельная панель «Специальные предложения» — переиспользует те же карточки
-// и то же состояние выбора (clientState.selectedServiceIds), что и обычный
-// каталог, просто рисует другой, фиксированный набор услуг.
-const SPECIAL_OFFER_IDS = ['sphere_vibro', 'combo_face_1', 'combo_face_2', 'combo_body_renew'];
-
-function renderSpecialOffers(){
-  const container = document.getElementById('specialOffersList');
-  container.innerHTML = '';
-  SPECIAL_OFFER_IDS
-    .map(getServiceById)
-    .filter(Boolean)
-    .forEach(svc => container.appendChild(buildServiceCardElement(svc)));
-  updateServicesFooter();
-}
-
-
 
 function toggleService(id){
   const idx = clientState.selectedServiceIds.indexOf(id);
@@ -276,29 +256,18 @@ function updateServicesFooter(){
   const totalDuration = getSelectedTotalDuration();
   const totalPrice = getSelectedTotalPrice();
 
-  // Оба футера (обычный каталог + панель «Спецпредложения») читают одно и
-  // то же clientState.selectedServiceIds — синхронизируем сразу оба разом,
-  // чтобы «Продолжить» появлялось там же, где человек сейчас смотрит.
-  [
-    { footerId: 'servicesFooter', summaryId: 'selectedServicesSummary', btnId: 'toStep2' },
-    { footerId: 'specialOffersFooter', summaryId: 'specialOffersSummary', btnId: 'specialOffersToStep2' },
-  ].forEach(({ footerId, summaryId, btnId }) => {
-    const footer = document.getElementById(footerId);
-    const btn = document.getElementById(btnId);
-    if (!footer || !btn) return;
+  const footer = document.getElementById('servicesFooter');
+  if (count === 0){
+    footer.classList.add('hidden');
+    return;
+  }
 
-    if (count === 0){
-      footer.classList.add('hidden');
-      return;
-    }
-
-    footer.classList.remove('hidden');
-    document.getElementById(summaryId).innerHTML = `
-      <span>${count === 1 ? 'Выбрана 1 услуга' : `Выбрано услуг: ${count}`} · ${formatDuration(totalDuration)}</span>
-      <span class="selected-total-price">${totalPrice.toLocaleString('ru-RU')} ₽</span>
-    `;
-    btn.disabled = false;
-  });
+  footer.classList.remove('hidden');
+  document.getElementById('selectedServicesSummary').innerHTML = `
+    <span>${count === 1 ? 'Выбрана 1 услуга' : `Выбрано услуг: ${count}`} · ${formatDuration(totalDuration)}</span>
+    <span class="selected-total-price">${totalPrice.toLocaleString('ru-RU')} ₽</span>
+  `;
+  document.getElementById('toStep2').disabled = false;
 }
 
 
@@ -527,7 +496,6 @@ function renderSummary(){
 }
 
 let pendingBooking = null; // переживает повторные клики на одну и ту же попытку записи
-let pendingPackageLeadId = null; // тот же приём для заявки на абонемент — см. submitBooking
 
 async function submitBooking(){
   const btn = document.getElementById('submitBooking');
@@ -899,6 +867,7 @@ function setupPhoneAutoFormat(input){
 }
 
 async function init(){
+  if (!PRICES_RAISED) document.getElementById('priceNotice').classList.remove('hidden');
   renderServices();
   await Store.loadSchedule();
   await Store.loadBookedSlots();
@@ -924,10 +893,6 @@ async function init(){
   });
   document.getElementById('backTo1').addEventListener('click', () => goToStep(1));
   document.getElementById('toStep2').addEventListener('click', () => goToStep(2));
-  document.getElementById('specialOffersToStep2').addEventListener('click', () => {
-    document.getElementById('specialOffersPanel').classList.add('hidden');
-    goToStep(2);
-  });
   document.getElementById('toStep3').addEventListener('click', () => goToStep(3));
   document.getElementById('backTo2').addEventListener('click', () => goToStep(2));
   document.getElementById('submitBooking').addEventListener('click', submitBooking);
@@ -938,132 +903,9 @@ async function init(){
     const anyOpen = screens.some(id => !document.getElementById(id).classList.contains('hidden'));
     // Второй клик по ссылке закрывает весь блок целиком, из какого бы
     // экрана внутри него ни кликнули — так же, как раньше работал toggle.
-    document.getElementById('specialOffersPanel').classList.add('hidden');
     showMyBookingsScreen(anyOpen ? null : 'myBookingsPanel');
   });
   setupPhoneAutoFormat(document.getElementById('myBookingsPhone'));
-
-  // «Специальные предложения» — та же логика открытия/закрытия, что у
-  // «Уже записаны?», плюс рендерим карточки лениво при первом открытии.
-  let specialOffersRendered = false;
-  function openSpecialOffers(){
-    showMyBookingsScreen(null);
-    if (!specialOffersRendered){
-      renderSpecialOffers();
-      specialOffersRendered = true;
-    }
-    document.getElementById('specialOffersPanel').classList.remove('hidden');
-    document.getElementById('specialOffersPanel').scrollIntoView({ behavior:'smooth', block:'start' });
-  }
-  document.getElementById('openSpecialOffersLink').addEventListener('click', () => {
-    const panel = document.getElementById('specialOffersPanel');
-    const isOpen = !panel.classList.contains('hidden');
-    if (isOpen){
-      panel.classList.add('hidden');
-    } else {
-      openSpecialOffers();
-    }
-  });
-
-  // Заявка на абонемент — отдельное модальное окно, намеренно не часть
-  // флоу записи (баннер про абонемент ведёт сразу сюда, а не в каталог).
-  function openPackageLeadModal(){
-    document.getElementById('packageLeadModalOverlay').classList.remove('hidden');
-  }
-  function closePackageLeadModal(){
-    document.getElementById('packageLeadModalOverlay').classList.add('hidden');
-  }
-  document.getElementById('promoBannerCta').addEventListener('click', openPackageLeadModal);
-  document.getElementById('openPackageLeadFromPanel').addEventListener('click', openPackageLeadModal);
-  document.getElementById('packageLeadModalClose').addEventListener('click', closePackageLeadModal);
-  document.getElementById('packageLeadModalOverlay').addEventListener('click', (e) => {
-    if (e.target.id === 'packageLeadModalOverlay') closePackageLeadModal();
-  });
-
-  // Выбор количества сеансов в заявке на абонемент — как радио-кнопки
-  let selectedPackageTier = null;
-  document.querySelectorAll('.package-tier-card').forEach(card => {
-    card.addEventListener('click', () => {
-      selectedPackageTier = card.dataset.tier;
-      document.querySelectorAll('.package-tier-card').forEach(c => c.classList.toggle('selected', c === card));
-    });
-  });
-
-  setupPhoneAutoFormat(document.getElementById('packageLeadPhone'));
-  document.getElementById('submitPackageLead').addEventListener('click', async () => {
-    const nameInput = document.getElementById('packageLeadName');
-    const phoneInput = document.getElementById('packageLeadPhone');
-    const btn = document.getElementById('submitPackageLead');
-    const status = document.getElementById('packageLeadStatus');
-    const honeypot = document.getElementById('packageLeadWebsite').value;
-
-    // Защита от двойного клика — та же, что у submitBooking.
-    if (btn.dataset.submitting === '1') return;
-
-    const name = nameInput.value.trim();
-    if (name.length < 2){
-      status.textContent = 'Введите имя';
-      status.style.color = '#B07E7E';
-      return;
-    }
-    const digits = phoneInput.value.replace(/\D/g, '');
-    // Та же проверка, что и при записи: 11 цифр и код оператора на 9.
-    const leadDigits = digits.startsWith('8') ? '7' + digits.slice(1) : digits;
-    if (leadDigits.length !== 11 || !/^79/.test(leadDigits)){
-      status.textContent = 'Проверьте номер: мобильный начинается с +7 9';
-      status.style.color = '#B07E7E';
-      return;
-    }
-    if (!selectedPackageTier){
-      status.textContent = 'Выберите количество сеансов';
-      status.style.color = '#B07E7E';
-      return;
-    }
-
-    // id создаём один раз и держим на все повторные попытки этой же заявки —
-    // если сеть подвела на ответе (частая история на мобильном интернете),
-    // повтор с тем же id сервер распознает как дубль и не создаст запись
-    // второй раз и не отправит Дарье повторное уведомление в Telegram.
-    if (!pendingPackageLeadId){
-      pendingPackageLeadId = 'pl_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    }
-
-    btn.dataset.submitting = '1';
-    btn.disabled = true;
-    btn.textContent = 'Отправляем...';
-    status.textContent = '';
-
-    try{
-      await withTimeout(
-        Store.submitPackageLead(pendingPackageLeadId, name, phoneInput.value, selectedPackageTier, honeypot),
-        15000
-      );
-      status.textContent = 'Заявка отправлена — Дарья скоро перезвонит 🌿';
-      status.style.color = 'var(--good)';
-      nameInput.value = '';
-      phoneInput.value = '';
-      selectedPackageTier = null;
-      pendingPackageLeadId = null;
-      document.querySelectorAll('.package-tier-card').forEach(c => c.classList.remove('selected'));
-      btn.textContent = 'Оставить заявку';
-      setTimeout(closePackageLeadModal, 1800);
-    }catch(e){
-      // Запрос мог реально дойти и сохраниться на сервере, а упасть уже
-      // здесь — на приёме ответа (обрыв мобильной сети). Раз id тот же самый,
-      // повторное нажатие в этом случае просто найдёт уже сохранённую заявку
-      // и покажет обычное «Заявка отправлена», а не создаст вторую — поэтому
-      // просим нажать ещё раз, а не пугаем явной формулировкой «ошибка».
-      if (e && String(e.message).includes('too-many-attempts')){
-        status.textContent = 'Слишком много попыток подряд. Подождите немного и попробуйте снова.';
-      } else {
-        status.textContent = 'Не получили ответ от сервера — возможно, заявка всё же дошла. Нажмите ещё раз, чтобы убедиться.';
-      }
-      status.style.color = '#B07E7E';
-      btn.textContent = 'Оставить заявку';
-    }
-    btn.dataset.submitting = '0';
-    btn.disabled = false;
-  });
 
   document.getElementById('findMyBookings').addEventListener('click', async () => {
     const phoneInput = document.getElementById('myBookingsPhone');
