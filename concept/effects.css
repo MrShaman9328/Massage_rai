@@ -110,12 +110,10 @@ html[data-aroma="sea"]      #step1{ background-color:#EEF5F1; }
 }
 
 /* Статичный вариант — при «уменьшить движение» в системе (решает effects.js):
-   убираем только то, что движется само; линия и цвета идут за прокруткой.
-   Веточки и дольки не плывут, а неподвижно проступают по фону — аромат
-   видят все, а самостоятельного движения нет. */
-.fx-still .petal{ bottom:auto; top:var(--y); opacity:var(--alpha); animation:petal-appear 1.2s ease both; }
-.fx-still .petal svg{ animation:none; transform:rotate(var(--rot)); }
-@keyframes petal-appear{ from{ opacity:0; } to{ opacity:var(--alpha); } }
+   убираем блик и параллакс шапки. Плывущие веточки и дольки оставлены всем
+   намеренно: эту настройку сообщают и Windows с выключенными эффектами, и
+   Android в энергосбережении — без них аромат не увидела бы заметная часть
+   клиенток. Плывут они медленно и только после нажатия на программу. */
 .fx-still .swoosh path{ animation:none; stroke-dashoffset:0; }
 .fx-still .price-notice::after{ display:none; }
 .fx-still header::before, .fx-still .crest{ transform:none; opacity:1; }

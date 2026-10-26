@@ -5,10 +5,10 @@
 // Без библиотек и внешних запросов: ничего не грузится с CDN, которые у части
 // клиентов не открываются на мобильном интернете.
 (function(){
-  // «Уменьшить движение» в системе (класс fx-still) убирает только то, что
-  // движется само: лепестки, блик, параллакс шапки. Линия и цвета остаются —
-  // они идут за пальцем. Часть Android-телефонов сообщает эту настройку сама
-  // (энергосбережение), и без этого такие клиентки не видели бы ничего.
+  // «Уменьшить движение» в системе (класс fx-still) убирает только блик и
+  // параллакс шапки. Линия, цвета и плывущие рисунки остаются: эту настройку
+  // сами сообщают Windows с выключенными эффектами и Android в
+  // энергосбережении, и без этого такие клиентки не видели бы ничего.
   // ?motion=1 в адресе включает всё принудительно — для показа концепта.
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches && !/[?&]motion=1/.test(location.search);
   const root = document.documentElement;
@@ -141,9 +141,7 @@
         const el = document.createElement('div');
         el.className = 'petal';
         const dur = 16 + Math.random() * 10;
-        // --y нужен только статичному варианту: там рисунки не плывут, а стоят.
-        el.style.cssText = `--x:${(Math.random() * 96).toFixed(1)}%; --y:${(6 + Math.random() * 84).toFixed(1)}%;` +
-          `--size:${(24 + Math.random() * 22).toFixed(0)}px;` +
+        el.style.cssText = `--x:${(Math.random() * 96).toFixed(1)}%; --size:${(24 + Math.random() * 22).toFixed(0)}px;` +
           `--dur:${dur.toFixed(1)}s; --delay:${(-Math.random() * dur).toFixed(1)}s;` +
           `--rot:${(Math.random() * 160 - 80).toFixed(0)}deg; --alpha:${(0.35 + Math.random() * 0.3).toFixed(2)};` +
           `--ink:${AROMA_INK[aroma]};`;
