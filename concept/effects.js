@@ -134,14 +134,16 @@
     setTimeout(() => {
       petals.innerHTML = '';
       petals.classList.remove('fade');
-      if (!aroma || reduced) return;
+      if (!aroma) return;
       // На телефоне меньше — фон за карточками виден только в просветах.
       const count = innerWidth < 600 ? 6 : 10;
       for (let i = 0; i < count; i++){
         const el = document.createElement('div');
         el.className = 'petal';
         const dur = 16 + Math.random() * 10;
-        el.style.cssText = `--x:${(Math.random() * 96).toFixed(1)}%; --size:${(24 + Math.random() * 22).toFixed(0)}px;` +
+        // --y нужен только статичному варианту: там рисунки не плывут, а стоят.
+        el.style.cssText = `--x:${(Math.random() * 96).toFixed(1)}%; --y:${(6 + Math.random() * 84).toFixed(1)}%;` +
+          `--size:${(24 + Math.random() * 22).toFixed(0)}px;` +
           `--dur:${dur.toFixed(1)}s; --delay:${(-Math.random() * dur).toFixed(1)}s;` +
           `--rot:${(Math.random() * 160 - 80).toFixed(0)}deg; --alpha:${(0.35 + Math.random() * 0.3).toFixed(2)};` +
           `--ink:${AROMA_INK[aroma]};`;

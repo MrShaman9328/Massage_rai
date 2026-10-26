@@ -69,6 +69,9 @@ html[data-aroma="sea"]      #step1{ background-color:#EEF5F1; }
 
 .fx .service{ position:relative; transition:border-color .4s, background .4s, box-shadow .6s; }
 .fx .service-row, .fx .spa-toggle, .fx .spa-details{ position:relative; z-index:1; }
+/* Содержимое карточек выше поднято на слой 1 (над рисунком аромата) —
+   липкая плашка «Продолжить» должна оставаться над ними. */
+.fx .services-footer{ z-index:2; }
 .fx .service.aroma-on{ border-color:var(--aroma-ink); box-shadow:0 10px 28px -14px var(--aroma-ink), inset 0 0 0 1px var(--aroma-ink); }
 .fx .service.aroma-on .service-name{ color:var(--aroma-ink); }
 .fx .service.aroma-on .spa-toggle{ color:var(--aroma-ink); }
@@ -107,8 +110,12 @@ html[data-aroma="sea"]      #step1{ background-color:#EEF5F1; }
 }
 
 /* Статичный вариант — при «уменьшить движение» в системе (решает effects.js):
-   убираем только то, что движется само; линия и цвета идут за прокруткой. */
-.fx-still .petals{ display:none; }
+   убираем только то, что движется само; линия и цвета идут за прокруткой.
+   Веточки и дольки не плывут, а неподвижно проступают по фону — аромат
+   видят все, а самостоятельного движения нет. */
+.fx-still .petal{ bottom:auto; top:var(--y); opacity:var(--alpha); animation:petal-appear 1.2s ease both; }
+.fx-still .petal svg{ animation:none; transform:rotate(var(--rot)); }
+@keyframes petal-appear{ from{ opacity:0; } to{ opacity:var(--alpha); } }
 .fx-still .swoosh path{ animation:none; stroke-dashoffset:0; }
 .fx-still .price-notice::after{ display:none; }
 .fx-still header::before, .fx-still .crest{ transform:none; opacity:1; }
