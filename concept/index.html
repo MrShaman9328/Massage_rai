@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<!-- КОНЦЕПТ оформления. Все пути — от корня сайта, как у настоящей страницы. -->
+<base href="../">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="yandex-verification" content="b74f1791a8549907" />
+<title>Женский массажный салон РАЙ в Краснодаре — онлайн-запись | rai-krd.ru</title>
+<meta name="description" content="Женский массажный салон «РАЙ» в Краснодаре (ГМР, ул. Гидростроителей 67). Классический, расслабляющий, антицеллюлитный массаж, SPA-программы, массаж лица, аппаратные процедуры. Удобная онлайн-запись. Рейтинг 5.0 на Яндекс Картах.">
+<meta name="keywords" content="массажный салон Краснодар, женский массаж Краснодар, массаж ГМР, массажный салон Гидростроителей, антицеллюлитный массаж Краснодар, спа программы Краснодар, массаж лица Краснодар, расслабляющий массаж, онлайн запись массаж Краснодар">
+<meta name="robots" content="noindex, nofollow">
+<meta name="geo.region" content="RU-KDA">
+<meta name="geo.placename" content="Краснодар">
+
+<meta property="og:type" content="website">
+<meta property="og:title" content="Женский массажный салон РАЙ в Краснодаре">
+<meta property="og:description" content="Классический, расслабляющий, антицеллюлитный массаж, SPA-программы и массаж лица. Онлайн-запись. Рейтинг 5.0 на Яндекс Картах.">
+<meta property="og:url" content="https://rai-krd.ru">
+<meta property="og:image" content="https://rai-krd.ru/logo-header.png">
+<meta property="og:locale" content="ru_RU">
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HealthAndBeautyBusiness",
+  "name": "РАЙ — женский массажный салон",
+  "description": "Женский массажный салон в Краснодаре: классический, расслабляющий, антицеллюлитный массаж, SPA-программы, массаж лица и аппаратные процедуры.",
+  "image": "https://rai-krd.ru/logo-header.png",
+  "url": "https://rai-krd.ru",
+  "telephone": "+7-903-458-55-70",
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "ул. Гидростроителей, 67",
+    "addressLocality": "Краснодар",
+    "addressRegion": "Краснодарский край",
+    "addressCountry": "RU"
+  },
+  "aggregateRating": {
+    "@type": "AggregateRating",
+    "ratingValue": "5.0",
+    "reviewCount": "55"
+  },
+  "priceRange": "₽₽"
+}
+</script>
+
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Marcellus&family=Yeseva+One&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/site.css?v=20261026">
+<link rel="stylesheet" href="concept/effects.css?v=1">
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <img class="crest" src="logo-header.png" alt="РАЙ" width="120" height="103">
+    <h1 class="brand-name">РАЙ</h1>
+    <div class="brand-tagline">место, куда хочется вернуться</div>
+    <div class="brand-sub" id="brandSub">Женский массажный салон<br>Онлайн-запись</div>
+    <svg class="swoosh" viewBox="0 0 120 14"><path d="M0 7 C 30 -5, 50 18, 80 5 C 95 -1, 105 7, 120 7" stroke="#B07E7E" stroke-width="1.5" fill="none"/></svg>
+  </header>
+
+  <div id="clientView">
+
+    <!-- Показывает js/booking.js до повышения цен (PRICE_CHANGE_AT в js/services.js) -->
+    <div class="price-notice hidden" id="priceNotice">
+      <b>Дорогие клиентки!</b> Успейте приобрести курс массажа по&nbsp;прежним ценам: с&nbsp;1&nbsp;ноября стоимость некоторых сеансов массажа и&nbsp;СПА-программ повышается
+    </div>
+
+    <div class="cancel-entry">
+      <a id="openMyBookingsLink">Уже записаны? Отменить или узнать время</a>
+    </div>
+
+    <div class="panel hidden" id="myBookingsPanel">
+      <h2 style="font-size:17px;">Ваша запись</h2>
+      <p class="hint">Введите номер телефона, на который записывались</p>
+      <div class="field">
+        <input type="tel" id="myBookingsPhone" placeholder="+7 900 000-00-00" maxlength="18" inputmode="tel">
+      </div>
+      <!-- honeypot: обычный человек это поле не видит и не заполняет, только скрипты -->
+      <div style="position:absolute; left:-9999px; top:-9999px;" aria-hidden="true">
+        <label for="myBookingsWebsite">Website</label>
+        <input type="text" id="myBookingsWebsite" name="website" tabindex="-1" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" id="findMyBookings">Найти запись</button>
+      <div class="save-status" id="myBookingsStatus"></div>
+    </div>
+
+    <div class="panel hidden" id="myBookingsListPanel">
+      <h2 style="font-size:17px;">Ваши записи</h2>
+      <div id="myBookingsResults"></div>
+      <button class="btn btn-ghost" style="margin-top:4px;" id="backToPhoneSearch">← Ввести другой номер</button>
+    </div>
+
+    <div class="panel hidden" id="cancelConfirmPanel">
+      <h2 style="font-size:17px;">Отменить запись?</h2>
+      <p class="hint" id="cancelConfirmDetails"></p>
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="cancelConfirmNo">Не отменять</button>
+        <button class="btn btn-primary" id="cancelConfirmYes" style="background:var(--rose-deep);">Да, отменить</button>
+      </div>
+      <div class="save-status" id="cancelConfirmStatus"></div>
+    </div>
+
+    <div class="panel hidden" id="reschedulePanel">
+      <h2 style="font-size:17px;">Изменить время</h2>
+      <p class="hint" id="rescheduleHint"></p>
+      <div class="slots-grid" id="rescheduleSlotsGrid"></div>
+      <div id="rescheduleEmpty" class="hidden empty-state">Ой, простите — свободного времени на этот день, кажется, больше нет 🙏<br>Попробуйте выбрать другой день заново, через новую запись.</div>
+      <div class="btn-row" style="margin-top:16px;">
+        <button class="btn btn-ghost" id="rescheduleBack">← Назад</button>
+        <button class="btn btn-primary" id="rescheduleConfirm" disabled>Подтвердить новое время</button>
+      </div>
+      <div class="save-status" id="rescheduleStatus"></div>
+    </div>
+
+    <div class="steps" id="stepsIndicator">
+      <div class="step-dot" data-step="1"></div>
+      <div class="step-dot" data-step="2"></div>
+      <div class="step-dot" data-step="3"></div>
+      <div class="step-dot" data-step="4"></div>
+    </div>
+
+    <div class="panel" id="step1">
+      <h2>Выберите услуги</h2>
+      <p class="hint">Можно выбрать до 3 услуг за одно посещение — нажмите на нужные</p>
+      <div id="servicesList"></div>
+      <div class="services-footer hidden" id="servicesFooter">
+        <div class="services-footer-summary" id="selectedServicesSummary"></div>
+        <button class="btn btn-primary" id="toStep2" disabled>Продолжить</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="step2">
+      <h2>Дата и время</h2>
+      <p class="hint" id="step2hint">Выберите удобный день</p>
+
+      <div class="cal-head">
+        <button class="cal-nav-btn" id="prevMonth">‹</button>
+        <div class="cal-month" id="calMonthLabel"></div>
+        <button class="cal-nav-btn" id="nextMonth">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+
+      <div id="slotsSection" class="hidden">
+        <div class="slots-title">Свободное время</div>
+        <div class="slots-grid" id="slotsGrid"></div>
+      </div>
+
+      <div class="btn-row" style="margin-top:22px;">
+        <button class="btn btn-ghost" id="backTo1">← Назад</button>
+        <button class="btn btn-primary" id="toStep3" disabled>Продолжить</button>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="step3">
+      <h2>Ваши данные</h2>
+      <p class="hint">Дарья свяжется с вами для подтверждения</p>
+
+      <div class="summary" id="bookingSummary"></div>
+
+      <div class="field">
+        <label for="clientName">Имя</label>
+        <input type="text" id="clientName" placeholder="Как вас зовут?" maxlength="30">
+      </div>
+      <div class="field">
+        <label for="clientPhone">Телефон</label>
+        <input type="tel" id="clientPhone" placeholder="+7 900 000-00-00" maxlength="18" inputmode="tel">
+      </div>
+      <div class="field">
+        <label for="clientComment">Комментарий <span style="text-transform:none; font-weight:400;">(не обязательно)</span></label>
+        <input type="text" id="clientComment" placeholder="Например: есть пожелания по маслу" maxlength="300">
+      </div>
+
+      <div class="field" style="display:flex; align-items:flex-start; gap:8px; margin-top:4px;">
+        <input type="checkbox" id="consentPD" style="width:18px; height:18px; margin-top:2px; flex-shrink:0;">
+        <label for="consentPD" style="font-size:12px; color:var(--ink-soft); font-weight:400; line-height:1.4; text-transform:none;">Я согласен(-на) на обработку персональных данных в соответствии с 152-ФЗ</label>
+      </div>
+
+      <div class="btn-row" style="margin-top:8px;">
+        <button class="btn btn-ghost" id="backTo2">← Назад</button>
+        <button class="btn btn-primary" id="submitBooking">Записаться</button>
+      </div>
+      <div class="wifi-hint">Если страница не отвечает — попробуйте подключиться к Wi-Fi и повторить запись</div>
+    </div>
+
+    <div class="panel hidden" id="step4">
+      <div class="confirm-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <h2 class="confirm-title">Запись принята</h2>
+      <p class="confirm-sub">Дарья получила уведомление и подтвердит запись лично — ожидайте звонок или сообщение.</p>
+      <div class="confirm-details" id="confirmDetails"></div>
+
+      <a class="btn btn-max" style="margin-top:16px;" id="maxReminderBtn" target="_blank" rel="noopener">🔔 Получать напоминания в MAX</a>
+      <a class="btn btn-telegram" style="margin-top:10px;" id="telegramReminderBtn" target="_blank" rel="noopener">🔔 Получать напоминания в Telegram</a>
+      <p style="font-size:12px; color:var(--ink-soft); text-align:center; margin:6px 0 0; line-height:1.4;">Выберите удобный мессенджер — откроется чат с ботом салона, нажмите в нём «Начать» / Start</p>
+
+      <button class="btn btn-primary" style="margin-top:16px;" id="newBooking">Записаться ещё раз</button>
+    </div>
+
+    <div class="panel reviews-panel" id="reviewsPanel">
+      <div class="reviews-header">
+        <div>
+          <h2 style="font-size:18px; margin-bottom:2px;">Отзывы клиентов</h2>
+          <div class="reviews-rating">
+            <span class="reviews-stars">★★★★★</span>
+            <span class="reviews-score">5.0</span>
+            <span class="reviews-count">· 55 оценок на Яндекс Картах</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="review-card">
+        <div class="review-top">
+          <span class="review-author">Юля Ф.</span>
+          <span class="review-date">12 мая</span>
+        </div>
+        <p class="review-text">Долго выбирала студию массажа, читала отзывы — выбор в районе был большой, не хотелось идти наугад. Название «Рай» сначала немного развеселило и показалось пафосным, особенно когда оказалось, что студия находится на цокольном этаже обычного дома. Но впечатления полностью оправдали ожидания: первое, что покорило — идеальная чистота, ни единой зацепки. А сам массаж — расслабление высшего уровня, особенно процедуры с кедровой бочкой и скрабом: кожа после ещё неделю была мягкой, как у младенца. Дашу не стыдно порекомендовать — невероятно тактичный и приятный мастер, подробно рассказала о всех процедурах, ответила на вопросы и помогла подобрать то, что нужно именно мне. Искала серебро, а нашла золото.</p>
+      </div>
+
+      <div class="review-card">
+        <div class="review-top">
+          <span class="review-author">Анна Ф.</span>
+          <span class="review-date">18 марта</span>
+        </div>
+        <p class="review-text">Порадовала себя детокс-программой в «Рае» и осталась под самым приятным впечатлением. Дарья — потрясающий специалист, мастер своего дела, внимательная и заботливая с первых минут. В программе всё продумано до мелочей: кедровая бочка, в которой тело сразу расслабляется и прогревается, мягкое скрабирование, глубокий массаж, который деликатно проработал самые напряжённые зоны, и обёртывание с водорослями — отдельная любовь. А ещё ароматный травяной чай с угощениями. Три часа пролетели незаметно в уютной, доверительной атмосфере — отдохнули и тело, и душа. Обязательно вернусь и буду рекомендовать подругам.</p>
+      </div>
+
+      <div class="review-card">
+        <div class="review-top">
+          <span class="review-author">Людмила Яровая</span>
+          <span class="review-date">8 мая</span>
+        </div>
+        <p class="review-text">Осталась в полном восторге от работы массажиста. Понравилось абсолютно всё: профессионализм — мастер точно определил зоны напряжения, выслушал все пожелания и подобрал подходящую технику. Атмосфера во время сеанса была очень комфортной — спокойная музыка и приятная обстановка помогли полностью расслабиться. Очень довольна результатом и обязательно вернусь снова.</p>
+      </div>
+
+      <a class="reviews-link" href="https://yandex.ru/maps/-/CTURVCKZ" target="_blank" rel="noopener">Смотреть все отзывы на Яндекс Картах →</a>
+    </div>
+
+    <div class="seo-about">
+      <h2 class="seo-about-title">Женский массажный салон в Краснодаре</h2>
+      <p>Массажный салон «РАЙ» находится в Краснодаре, в микрорайоне ГМР, на улице Гидростроителей, 67. Мы специализируемся на женском массаже и предлагаем классический, расслабляющий и антицеллюлитный массаж тела, массаж лица, а также авторские SPA-программы и аппаратные процедуры. Каждый сеанс проводится индивидуально, в спокойной и уютной атмосфере.</p>
+      <p>Записаться на массаж можно онлайн на этой странице, за пару минут: выберите услугу, удобные дату и время. Салон «РАЙ» имеет рейтинг 5.0 на Яндекс Картах по отзывам клиентов.</p>
+    </div>
+
+    <footer>
+      ул. Гидростроителей 67, Краснодар (ГМР)<br>
+      <a href="tel:+79034585570" class="footer-phone">8 903 458-55-70</a>
+
+      <div class="footer-contacts">
+        <a href="https://t.me/Daria_massage_Rai" target="_blank" rel="noopener" class="contact-icon contact-telegram" aria-label="Telegram">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </a>
+        <a href="https://wa.me/79034585570" target="_blank" rel="noopener" class="contact-icon contact-whatsapp" aria-label="WhatsApp">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        </a>
+        <a href="https://max.ru/join/LfBXbW-cFWMDbSw-wZ1iiU8_fBMSZpPwXa2Xs5KF90w" target="_blank" rel="noopener" class="contact-icon contact-max" aria-label="MAX">
+          <svg viewBox="0 0 24 24" width="19" height="19"><circle cx="12" cy="10" r="7.3" fill="none" stroke="#fff" stroke-width="4.6"></circle><path d="M7.6 15.2c.4 2.6-.3 4.4-1.5 5.6 1.8-.2 3.4-1 4.5-2 .5-.4.5-1.1.1-1.6-.8-1-2-1.6-3.1-2z" fill="#fff"></path></svg>
+        </a>
+        <a href="https://www.instagram.com/daria_massage_gmr" target="_blank" rel="noopener" class="contact-icon contact-instagram" aria-label="Instagram">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line></svg>
+        </a>
+      </div>
+    </footer>
+  </div>
+
+</div>
+
+<script>
+// Концепт: отправка и отмена записи отсюда отключены — чтобы при пробе
+// не создать Дарье настоящую бронь. Чтение графика работает как на сайте.
+(function(){
+  const realFetch = window.fetch;
+  window.fetch = function(url, opts){
+    try{
+      const body = opts && opts.body ? JSON.parse(opts.body) : null;
+      if (body && /^(createBooking|cancelBooking|rescheduleBooking)/.test(body.action)){
+        alert('Это концепт оформления — запись отсюда не отправляется.');
+        return Promise.reject(new Error('concept'));
+      }
+    }catch(e){}
+    return realFetch.apply(this, arguments);
+  };
+})();
+</script>
+<script src="js/services.js?v=20261023"></script>
+<script src="js/booking.js?v=20261026"></script>
+<script src="concept/effects.js?v=1"></script>
+</body>
+</html>
