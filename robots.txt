@@ -1,6 +1,5 @@
 User-agent: *
 Allow: /
 Disallow: /admin.html
-Disallow: /concept/
 
 Sitemap: https://rai-krd.ru/sitemap.xml
