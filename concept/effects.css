@@ -42,38 +42,20 @@
 
 /* Плывущие веточки и дольки — цвет берут из аромата */
 .petals{ position:absolute; inset:0; }
-.petal{
-  position:absolute; bottom:-60px; left:var(--x); width:var(--size); height:var(--size);
-  color:var(--ink); opacity:0;
-  animation:petal-rise var(--dur) linear var(--delay) infinite;
-  transition:opacity 1s ease;
-}
-.petal svg{ width:100%; height:100%; animation:petal-sway calc(var(--dur) / 3) ease-in-out infinite alternate; }
-.petals.fade .petal{ opacity:0 !important; animation-play-state:paused; }
-@keyframes petal-rise{
-  0%   { transform:translateY(0) rotate(0deg); opacity:0; }
-  8%   { opacity:var(--alpha); }
-  85%  { opacity:var(--alpha); }
-  100% { transform:translateY(calc(-100vh - 120px)) rotate(var(--rot)); opacity:0; }
-}
+/* Подъём рисунков задаёт effects.js через element.animate() готовыми
+   числами. CSS-переменные внутри @keyframes Яндекс Браузер на Android не
+   анимирует: рисунок сразу вставал в конечную точку и стоял на месте. */
+.petal{ position:absolute; bottom:-60px; opacity:0; will-change:transform, opacity; }
+.petal svg{ width:100%; height:100%; animation:petal-sway 6s ease-in-out infinite alternate; }
+.petals.fade .petal{ opacity:0 !important; }
 @keyframes petal-sway{ from{ transform:translateX(-14px); } to{ transform:translateX(14px); } }
 
 /* Вспорх по нажатию на программу: рисунки поднимаются из карточки поверх
    страницы и тают. Фоновые рисунки на телефоне почти скрыты карточками —
    этот отклик видно на любом экране. Нажатиям не мешает (pointer-events). */
 .aroma-burst{ position:fixed; inset:0; z-index:30; pointer-events:none; overflow:hidden; }
-.burst-sprig{
-  position:absolute; left:var(--x); top:var(--y); width:var(--size); height:var(--size); margin:calc(var(--size) / -2) 0 0 calc(var(--size) / -2);
-  color:var(--ink); opacity:0; will-change:transform, opacity;
-  animation:burst-rise var(--dur) cubic-bezier(.2,.7,.3,1) var(--delay) forwards;
-}
+.burst-sprig{ position:absolute; opacity:0; will-change:transform, opacity; }
 .burst-sprig svg{ width:100%; height:100%; animation:petal-sway 1.3s ease-in-out infinite alternate; }
-@keyframes burst-rise{
-  0%   { opacity:0; transform:translate(0, 0) rotate(0deg) scale(.5); }
-  15%  { opacity:var(--alpha); }
-  65%  { opacity:var(--alpha); }
-  100% { opacity:0; transform:translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1); }
-}
 
 /* На телефоне панель услуг закрывает весь экран, и фон за ней не виден.
    Поэтому аромат проявляется и внутри панели: она чуть окрашивается,

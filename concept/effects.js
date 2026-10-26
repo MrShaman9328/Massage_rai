@@ -105,6 +105,7 @@
   // двигаются плавно даже при рывках прокрутки пальцем.
   let target = 0, current = 0, rafId = 0;
   const clamp = (x) => Math.min(1, Math.max(0, x));
+  const rnd = (a, b) => a + Math.random() * (b - a);
   const ease = (t) => t * t * (3 - 2 * t);
 
   function readScroll(){
@@ -155,16 +156,19 @@
       if (!aroma) return;
       // На телефоне меньше — фон за карточками виден только в просветах.
       const count = innerWidth < 600 ? 6 : 10;
+      const rise = innerHeight + 120;
       for (let i = 0; i < count; i++){
         const el = document.createElement('div');
         el.className = 'petal';
-        const dur = 16 + Math.random() * 10;
-        el.style.cssText = `--x:${(Math.random() * 96).toFixed(1)}%; --size:${(24 + Math.random() * 22).toFixed(0)}px;` +
-          `--dur:${dur.toFixed(1)}s; --delay:${(-Math.random() * dur).toFixed(1)}s;` +
-          `--rot:${(Math.random() * 160 - 80).toFixed(0)}deg; --alpha:${(0.35 + Math.random() * 0.3).toFixed(2)};` +
-          `--ink:${AROMA_INK[aroma]};`;
+        const size = rnd(24, 46), dur = rnd(16, 26) * 1000, rot = rnd(-80, 80), alpha = rnd(0.35, 0.65);
+        el.style.cssText = `left:${rnd(0, 96).toFixed(1)}%; width:${size.toFixed(0)}px; height:${size.toFixed(0)}px; color:${AROMA_INK[aroma]};`;
         el.innerHTML = spriteSvg(aroma);
         petals.appendChild(el);
+        // Линейное движение: промежуточные кадры — доли пути, без пересчёта.
+        const at = (k, o) => ({ offset: k, opacity: o, transform: `translateY(${(-rise * k).toFixed(0)}px) rotate(${(rot * k).toFixed(0)}deg)` });
+        // Отрицательная задержка — рисунки сразу оказываются на разной высоте.
+        el.animate([at(0, 0), at(0.08, alpha), at(0.85, alpha), at(1, 0)],
+          { duration: dur, delay: -Math.random() * dur, iterations: Infinity, easing: 'linear' });
       }
     }, activeAroma ? 600 : 0);
   }
@@ -230,15 +234,22 @@
     for (let i = 0; i < 7; i++){
       const el = document.createElement('div');
       el.className = 'burst-sprig';
-      const rnd = (a, b) => a + Math.random() * (b - a);
-      el.style.cssText =
-        `--x:${(r.left + rnd(0.08, 0.92) * r.width).toFixed(0)}px; --y:${(r.top + rnd(0.35, 0.95) * Math.min(r.height, 160)).toFixed(0)}px;` +
-        `--size:${rnd(22, 36).toFixed(0)}px; --dur:${rnd(2.8, 4).toFixed(2)}s; --delay:${rnd(0, 0.45).toFixed(2)}s;` +
-        `--dx:${rnd(-50, 50).toFixed(0)}px; --dy:${(-rnd(170, 320)).toFixed(0)}px; --rot:${rnd(-70, 70).toFixed(0)}deg;` +
-        `--alpha:${rnd(0.65, 0.9).toFixed(2)}; --ink:${AROMA_INK[aroma]};`;
+      const size = rnd(22, 36);
+      const x = r.left + rnd(0.08, 0.92) * r.width - size / 2;
+      const y = r.top + rnd(0.35, 0.95) * Math.min(r.height, 160) - size / 2;
+      el.style.cssText = `left:${x.toFixed(0)}px; top:${y.toFixed(0)}px; width:${size.toFixed(0)}px; height:${size.toFixed(0)}px; color:${AROMA_INK[aroma]};`;
       el.innerHTML = spriteSvg(aroma);
-      el.addEventListener('animationend', (e) => { if (e.target === el) el.remove(); });
       burstLayer.appendChild(el);
+      const dx = rnd(-50, 50), dy = -rnd(170, 320), rot = rnd(-70, 70), alpha = rnd(0.65, 0.9);
+      // Все кадры с обоими свойствами и готовыми числами — так анимация
+      // одинаково идёт во всех браузерах. Плавность — общим easing на весь путь.
+      const at = (k, o) => ({
+        offset: k, opacity: o,
+        transform: `translate(${(dx * k).toFixed(1)}px, ${(dy * k).toFixed(1)}px) rotate(${(rot * k).toFixed(1)}deg) scale(${(0.5 + 0.5 * k).toFixed(3)})`,
+      });
+      const anim = el.animate([at(0, 0), at(0.15, alpha), at(0.65, alpha), at(1, 0)],
+        { duration: rnd(2800, 4000), delay: rnd(0, 450), easing: 'cubic-bezier(.2,.7,.3,1)', fill: 'forwards' });
+      anim.onfinish = () => el.remove();
     }
   }
 
