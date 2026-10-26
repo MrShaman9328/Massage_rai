@@ -1,11 +1,15 @@
 // Концепт оформления (стили — concept/effects.css): фон по прокрутке
-// становится «вечерним», линия-свуш рисуется вслед за прокруткой, у SPA-
-// программ свой аромат — цвет фона и плывущие веточки/дольки, как на афишах.
+// становится «вечерним», линия-свуш в боковых полях рисуется вслед за
+// прокруткой, у SPA-программ свой аромат — цвет и плывущие веточки/дольки,
+// как на афишах. Аромат включается только по нажатию на программу.
 // Без библиотек и внешних запросов: ничего не грузится с CDN, которые у части
 // клиентов не открываются на мобильном интернете.
 (function(){
-  // «Уменьшить движение» в системе — статичный вариант (класс fx-still).
-  // ?motion=1 в адресе включает анимацию принудительно — для показа концепта.
+  // «Уменьшить движение» в системе (класс fx-still) убирает только то, что
+  // движется само: лепестки, блик, параллакс шапки. Линия и цвета остаются —
+  // они идут за пальцем. Часть Android-телефонов сообщает эту настройку сама
+  // (энергосбережение), и без этого такие клиентки не видели бы ничего.
+  // ?motion=1 в адресе включает всё принудительно — для показа концепта.
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches && !/[?&]motion=1/.test(location.search);
   const root = document.documentElement;
   root.classList.add('fx', reduced ? 'fx-still' : 'fx-motion');
@@ -50,21 +54,36 @@
   const thinPath = amb.querySelector('.flow-thin');
   const spark = amb.querySelector('.flow-spark');
 
-  // Кривые заданы в долях экрана (x — из 100, y — из 1000) и пересчитываются
-  // в пиксели под размер окна. Растягивать SVG через preserveAspectRatio
-  // нельзя: линия стала бы разной толщины, а non-scaling-stroke ломает
-  // пунктир, на котором держится «рисование».
-  const FLOW_MAIN = 'M88 -10C122 120 8 160 20 300S96 470 80 600 4 760 30 880 92 980 70 1015';
-  const FLOW_THIN = 'M10 -10C-20 140 92 200 80 330S8 520 22 640 96 800 72 920 30 1000 40 1015';
+  // Линия идёт волной в боковых полях — справа основная с огоньком, слева
+  // тонкая. За панелями её не видно, а поля свободны всегда: на телефоне
+  // это полосы по 20px у краёв, на компьютере — широкие поля вокруг колонки.
+  // Путь строится в пикселях под размер окна: растягивать SVG нельзя —
+  // линия стала бы разной толщины, а non-scaling-stroke ломает пунктир,
+  // на котором держится «рисование».
+  const WRAP_MAX = 560, WRAP_PAD = 20;
   let mainLen = 0;
-  function scaleFlow(d){
-    let i = 0;
-    return d.replace(/-?\d+(\.\d+)?/g, n => (i++ % 2 === 0 ? n / 100 * innerWidth : n / 1000 * innerHeight).toFixed(1));
+  function wave(xA, xB, waves){
+    const top = -20, step = (innerHeight + 40) / waves;
+    let d = `M${xA.toFixed(1)} ${top}`;
+    for (let i = 1; i <= waves; i++){
+      const y = top + step * i;
+      const x = i % 2 ? xB : xA;
+      // Вертикальные касательные в каждой точке — волна без изломов.
+      d += i === 1
+        ? ` C${xA.toFixed(1)} ${(top + step / 2).toFixed(1)} ${x.toFixed(1)} ${(y - step / 2).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`
+        : ` S${x.toFixed(1)} ${(y - step / 2).toFixed(1)} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    }
+    return d;
   }
   function layoutFlow(){
+    const margin = Math.max(0, (innerWidth - WRAP_MAX) / 2) + WRAP_PAD;
+    // Размах волны: в узком поле — почти всё поле, в широком — до 160px по центру.
+    const swing = Math.min(margin * 0.6, 160);
+    const lo = (margin - swing) / 2, hi = lo + swing;
+    const waves = innerWidth < 600 ? 5 : 4;
     flowSvg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
-    mainPath.setAttribute('d', scaleFlow(FLOW_MAIN));
-    thinPath.setAttribute('d', scaleFlow(FLOW_THIN));
+    mainPath.setAttribute('d', wave(innerWidth - hi, innerWidth - lo, waves));
+    thinPath.setAttribute('d', wave(lo, hi, waves + 1));
     mainLen = mainPath.getTotalLength();
   }
   layoutFlow();
@@ -89,13 +108,11 @@
     current = reduced || Math.abs(d) < 0.0005 ? target : current + d * 0.12;
 
     evening.style.opacity = ease(current).toFixed(3);
-    if (!reduced){
-      mainPath.style.strokeDashoffset = (1 - current).toFixed(4);
-      thinPath.style.strokeDashoffset = (1 - clamp(current * 1.15 - 0.08)).toFixed(4);
-      const pt = mainPath.getPointAtLength(current * mainLen);
-      spark.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0)`;
-      spark.style.opacity = current > 0.01 && current < 0.995 ? '1' : '0';
-    }
+    mainPath.style.strokeDashoffset = (1 - current).toFixed(4);
+    thinPath.style.strokeDashoffset = (1 - clamp(current * 1.15 - 0.08)).toFixed(4);
+    const pt = mainPath.getPointAtLength(current * mainLen);
+    spark.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0)`;
+    spark.style.opacity = current > 0.01 && current < 0.995 ? '1' : '0';
     if (current !== target) rafId = requestAnimationFrame(frame);
   }
 
@@ -111,7 +128,6 @@
   if (servicesPanel) servicesPanel.prepend(petals);
   const spriteSvg = (aroma) => `<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round">${SPRITES[aroma]}</svg>`;
   let activeAroma = null;
-  let clearTimer = 0;
 
   function spawnPetals(aroma){
     petals.classList.add('fade');
@@ -136,7 +152,6 @@
   }
 
   function setAroma(aroma, card){
-    clearTimeout(clearTimer);
     document.querySelectorAll('.service.aroma-on').forEach(el => { if (el !== card) el.classList.remove('aroma-on'); });
     if (card) card.classList.add('aroma-on');
     if (aroma === activeAroma) return;
@@ -146,51 +161,49 @@
     activeAroma = aroma;
   }
 
-  // Аромат включается, когда SPA-карточка проходит через середину экрана,
-  // и гаснет с задержкой, когда прокрутили мимо всех программ.
-  const inBand = new Set();
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => {
-      if (e.isIntersecting){
-        inBand.add(e.target);
-        setAroma(AROMAS[e.target.dataset.id], e.target);
-      } else {
-        inBand.delete(e.target);
-        e.target.classList.remove('aroma-on');
-      }
-    });
-    if (!inBand.size){
-      clearTimeout(clearTimer);
-      clearTimer = setTimeout(() => setAroma(null, null), 700);
-    }
-  }, { rootMargin: '-42% 0px -42% 0px' });
-
   // Карточки рисует js/booking.js и перерисовывает при возврате к шагу 1 —
-  // поэтому следим за списком и подписываемся на новые карточки.
-  const observeCards = () => {
+  // поэтому следим за списком и дорисовываем рисунок в новые карточки.
+  const decorateCards = () => {
     document.querySelectorAll('.service').forEach(el => {
       const aroma = AROMAS[el.dataset.id];
       if (aroma && !el.dataset.fx){
         el.dataset.fx = '1';
         el.style.setProperty('--aroma-ink', AROMA_INK[aroma]);
         el.insertAdjacentHTML('beforeend', `<span class="aroma-mark" aria-hidden="true">${spriteSvg(aroma)}</span>`);
-        io.observe(el);
       }
     });
   };
   const list = document.getElementById('servicesList');
   if (list){
-    new MutationObserver(observeCards).observe(list, { childList: true });
-    observeCards();
+    new MutationObserver(decorateCards).observe(list, { childList: true });
+    decorateCards();
   }
 
-  // Раскрыли «Что входит в программу» — аромат этой программы сразу.
+  // Аромат — только по нажатию: выбрали программу или раскрыли «Что входит».
+  // Сняли выбор и закрыли описание — аромат переходит к другой выбранной
+  // SPA-программе или гаснет. Слушаем в фазе захвата: кнопка «Что входит»
+  // останавливает всплытие (js/booking.js), а состояние карточки читаем
+  // после того, как booking.js его поменяет.
   document.addEventListener('click', (e) => {
-    const toggle = e.target.closest('.spa-toggle');
-    if (!toggle) return;
-    const aroma = AROMAS[toggle.dataset.toggle];
-    if (aroma) setAroma(aroma, toggle.closest('.service'));
-  });
+    const card = e.target.closest('.service');
+    if (!card || !AROMAS[card.dataset.id]) return;
+    if (!e.target.closest('.spa-toggle, .service-row')) return;
+    setTimeout(() => {
+      if (isEngaged(card)){
+        setAroma(AROMAS[card.dataset.id], card);
+      } else if (card.classList.contains('aroma-on')){
+        const spa = [...document.querySelectorAll('.service')].filter(el => el !== card && AROMAS[el.dataset.id]);
+        const other = spa.find(el => el.classList.contains('selected')) || spa.find(isEngaged);
+        setAroma(other ? AROMAS[other.dataset.id] : null, other || null);
+      }
+    }, 0);
+  }, true);
+
+  // Программа «в фокусе»: выбрана для записи или раскрыто её описание.
+  function isEngaged(card){
+    const details = card.querySelector('.spa-details');
+    return card.classList.contains('selected') || (details && !details.classList.contains('hidden'));
+  }
 
   // ---------- Появление блоков ----------
   const revealIo = new IntersectionObserver((entries) => {
@@ -204,4 +217,19 @@
     el.classList.add('reveal');
     revealIo.observe(el);
   });
+
+  // ?debug=1 — что браузер сообщает о телефоне: разобраться, почему у
+  // кого-то эффекты не видны, не залезая в его настройки.
+  if (/[?&]debug=1/.test(location.search)){
+    const info = document.createElement('div');
+    info.className = 'fx-debug';
+    const update = () => {
+      info.textContent = `Уменьшить движение: ${matchMedia('(prefers-reduced-motion: reduce)').matches ? 'ДА' : 'нет'}` +
+        ` · режим: ${reduced ? 'статичный' : 'анимация'} · экран ${innerWidth}×${innerHeight}` +
+        ` · ${navigator.userAgent.replace(/^Mozilla\/5\.0 /, '').slice(0, 120)}`;
+    };
+    update();
+    addEventListener('resize', update);
+    document.body.appendChild(info);
+  }
 })();

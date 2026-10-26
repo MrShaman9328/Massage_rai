@@ -99,11 +99,22 @@ html[data-aroma="sea"]      #step1{ background-color:#EEF5F1; }
 .fx .reveal{ opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
 .fx .reveal.in{ opacity:1; transform:none; }
 
+/* На телефоне линия живёт в полосе 20px у края — делаем её заметнее */
+@media (max-width: 600px){
+  .flow-main{ stroke:rgba(176,126,126,0.75); stroke-width:2; }
+  .flow-thin{ stroke:rgba(156,130,102,0.5); stroke-width:1.4; }
+  .flow-spark{ width:18px; height:18px; margin:-9px 0 0 -9px; }
+}
+
 /* Статичный вариант — при «уменьшить движение» в системе (решает effects.js):
-   остаются только цвета — вечерний тон и подсветка аромата. */
-.fx-still .petals, .fx-still .flow, .fx-still .flow-spark{ display:none; }
+   убираем только то, что движется само; линия и цвета идут за прокруткой. */
+.fx-still .petals{ display:none; }
 .fx-still .swoosh path{ animation:none; stroke-dashoffset:0; }
 .fx-still .price-notice::after{ display:none; }
 .fx-still header::before, .fx-still .crest{ transform:none; opacity:1; }
 .fx-still .reveal{ opacity:1; transform:none; transition:none; }
-.fx-still .amb-aroma{ transition:none; }
+
+.fx-debug{
+  position:fixed; left:8px; right:8px; bottom:8px; z-index:50; padding:8px 10px; border-radius:10px;
+  background:rgba(58,44,41,0.88); color:#fff; font:11px/1.4 'Manrope', sans-serif; word-break:break-word;
+}
