@@ -209,6 +209,7 @@
     setTimeout(() => {
       if (isEngaged(card)){
         setAroma(AROMAS[card.dataset.id], card);
+        burst(card, AROMAS[card.dataset.id]);
       } else if (card.classList.contains('aroma-on')){
         const spa = [...document.querySelectorAll('.service')].filter(el => el !== card && AROMAS[el.dataset.id]);
         const other = spa.find(el => el.classList.contains('selected')) || spa.find(isEngaged);
@@ -216,6 +217,30 @@
       }
     }, 0);
   }, true);
+
+  // Вспорх: рисунки программы поднимаются из её карточки поверх страницы
+  // и тают за 3–4 секунды. Координаты — экранные, на момент нажатия.
+  const burstLayer = document.createElement('div');
+  burstLayer.className = 'aroma-burst';
+  burstLayer.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(burstLayer);
+
+  function burst(card, aroma){
+    const r = card.getBoundingClientRect();
+    for (let i = 0; i < 7; i++){
+      const el = document.createElement('div');
+      el.className = 'burst-sprig';
+      const rnd = (a, b) => a + Math.random() * (b - a);
+      el.style.cssText =
+        `--x:${(r.left + rnd(0.08, 0.92) * r.width).toFixed(0)}px; --y:${(r.top + rnd(0.35, 0.95) * Math.min(r.height, 160)).toFixed(0)}px;` +
+        `--size:${rnd(22, 36).toFixed(0)}px; --dur:${rnd(2.8, 4).toFixed(2)}s; --delay:${rnd(0, 0.45).toFixed(2)}s;` +
+        `--dx:${rnd(-50, 50).toFixed(0)}px; --dy:${(-rnd(170, 320)).toFixed(0)}px; --rot:${rnd(-70, 70).toFixed(0)}deg;` +
+        `--alpha:${rnd(0.65, 0.9).toFixed(2)}; --ink:${AROMA_INK[aroma]};`;
+      el.innerHTML = spriteSvg(aroma);
+      el.addEventListener('animationend', (e) => { if (e.target === el) el.remove(); });
+      burstLayer.appendChild(el);
+    }
+  }
 
   // Программа «в фокусе»: выбрана для записи или раскрыто её описание.
   function isEngaged(card){
