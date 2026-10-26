@@ -557,6 +557,28 @@
   .status-done{ background:rgba(110,156,124,0.15); color:var(--good); }
   .status-noshow{ background:rgba(176,126,126,0.12); color:var(--rose-deep); }
 
+  /* --- Визит по факту и курсы --- */
+  .mark-actions + .mark-actions{ margin-top:8px; }
+  .mark-course{ color:var(--bronze); border-color:var(--bronze); }
+  .mark-course:hover{ background:rgba(156,130,102,0.1); }
+  .mark-edit{ color:var(--ink-soft); }
+  .mark-edit:hover{ background:rgba(58,44,41,0.05); }
+  .course-line{ font-size:12.5px; line-height:1.6; color:var(--bronze); font-weight:600; margin:6px 0 2px; }
+  .course-finished{ font-weight:400; color:var(--ink-soft); }
+  .pay-tag{ font-size:11.5px; font-weight:700; color:var(--bronze); white-space:nowrap; }
+  .booked-was{ font-size:12px; color:var(--ink-soft); margin:-2px 0 6px; }
+  .history-card-foot{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:8px; }
+  .history-card-foot .status-badge{ margin-top:0; }
+  .edit-visit-btn{
+    padding:5px 12px; border-radius:9px; border:1.5px solid var(--line); background:transparent;
+    font-family:'Manrope'; font-weight:700; font-size:12px; color:var(--bronze); cursor:pointer;
+  }
+  .edit-visit-btn:hover{ color:var(--rose-deep); border-color:var(--rose-deep); }
+  .visit-form{ margin:12px 0 0; }
+  .visit-form .segmented{ margin-bottom:14px; }
+  .vf-hint{ font-size:12.5px; margin:-6px 0 14px; }
+  .monthly-sub{ flex-basis:100%; font-size:11.5px; color:var(--bronze); text-align:right; }
+
   /* --- Клиенты --- */
   .client-stats{
     display:flex; flex-wrap:wrap; gap:12px;

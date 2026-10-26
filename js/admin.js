@@ -190,8 +190,12 @@ const Store = {
     await callApi('updateBookingTime', { bookingId, date, start, end });
   },
 
-  async markBooking(bookingId, status){
-    await callApi('markBooking', { bookingId, status });
+  async markBooking(bookingId, status, actual){
+    await callApi('markBooking', { bookingId, status, ...(actual ? { actual } : {}) });
+  },
+
+  async editHistoryEntry(bookingId, status, actual){
+    await callApi('editHistoryEntry', { bookingId, status, ...(actual ? { actual } : {}) });
   },
 
   async getHistory(){
@@ -683,6 +687,62 @@ function setupAdminTabs(){
 const MONTH_FULL_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 
 let historyMonthOffset = 0; // 0 = текущий месяц, -1 = предыдущий, и т.д.
+let historyCache = [];      // последняя загруженная история — для остатков по курсам
+
+// ============================================================
+// ВИЗИТ ПО ФАКТУ И КУРСЫ
+// ============================================================
+// В истории рядом с записью может лежать actual — как визит прошёл на самом
+// деле (подробности — в index.js у validateVisitActual). Всё, что считает
+// деньги и время, читает визит через эти функции, а не напрямую.
+const PAY_TYPE_LABELS = { single: 'Разовая оплата', course_sale: 'Покупка курса', course_visit: 'По курсу' };
+
+function visitPaid(h){
+  if (h.status !== 'completed') return 0;
+  return h.actual ? (h.actual.paid || 0) : (h.servicePrice || 0);
+}
+function visitServiceName(h){
+  return h.actual ? h.actual.serviceName : disambiguateServiceName(h.serviceName, h.serviceDuration);
+}
+function visitDuration(h){
+  return h.actual ? (h.actual.serviceDuration || 0) : (h.serviceDuration || 0);
+}
+
+// Курсы целиком выводятся из истории: курс заводит визит с actual.course,
+// посещения ссылаются на него через actual.courseId. excludeId — визит,
+// который сейчас правят: его собственное посещение в остаток не считаем,
+// иначе при правке курс выглядел бы на один сеанс «использованнее».
+function buildCourses(history, excludeId){
+  const courses = new Map();
+  history.forEach(h => {
+    if (!h.actual || !h.actual.course) return;
+    courses.set(h.actual.courseId, {
+      id: h.actual.courseId,
+      name: h.actual.course.name,
+      sessions: h.actual.course.sessions,
+      used: h.actual.course.usedBefore || 0,
+      tail: phoneTail10(h.clientPhone),
+      boughtAt: h.date,
+    });
+  });
+  history.forEach(h => {
+    if (h.id === excludeId || h.status !== 'completed' || !h.actual || !h.actual.courseId) return;
+    const c = courses.get(h.actual.courseId);
+    if (c) c.used++;
+  });
+  return courses;
+}
+
+function activeCoursesFor(phone, history, excludeId){
+  const tail = phoneTail10(phone);
+  return [...buildCourses(history, excludeId).values()]
+    .filter(c => c.tail === tail && c.used < c.sessions)
+    .sort((a, b) => a.boughtAt.localeCompare(b.boughtAt));
+}
+
+function courseLeftLabel(c){
+  return `осталось ${c.sessions - c.used} из ${c.sessions}`;
+}
 
 function getHistoryMonthKey(offset){
   const d = new Date();
@@ -698,6 +758,7 @@ async function renderHistoryTab(){
   let history = [];
   try{ history = await Store.getHistory(); }
   catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+  historyCache = history;
 
   // Записи, которые ждут отметки — показываем всегда, вне зависимости от
   // выбранного месяца, так как это требует действия прямо сейчас.
@@ -798,6 +859,16 @@ function buildWaitingCard(b){
     return card;
   }
 
+  // Активный курс клиента — сразу на карточке: так «пришёл по курсу»
+  // отмечается в одно касание, без формы. Курсов несколько — выбор в форме.
+  const courses = activeCoursesFor(b.clientPhone, historyCache);
+  const courseLine = courses.length
+    ? `<div class="course-line">🎟 ${courses.map(c => `«${escapeHtml(c.name)}» — ${courseLeftLabel(c)}`).join('<br>🎟 ')}</div>`
+    : '';
+  const courseBtn = courses.length === 1
+    ? `<button class="mark-btn mark-course">🎟 По курсу</button>`
+    : '';
+
   card.innerHTML = `
     <div class="booking-top">
       <span class="booking-date">${dateStr}</span>
@@ -805,13 +876,29 @@ function buildWaitingCard(b){
     </div>
     <div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
     ${clientLine(b.clientName, b.clientPhone)}
+    ${courseLine}
     <div class="mark-actions">
-      <button class="mark-btn mark-completed" data-id="${escapeHtml(b.id)}">✅ Пришёл</button>
-      <button class="mark-btn mark-noshow" data-id="${escapeHtml(b.id)}">❌ Не пришёл</button>
+      <button class="mark-btn mark-completed">✅ Пришёл</button>
+      <button class="mark-btn mark-noshow">❌ Не пришёл</button>
+    </div>
+    <div class="mark-actions">
+      ${courseBtn}
+      <button class="mark-btn mark-edit">✏️ Пришёл, с правками</button>
     </div>
   `;
   card.querySelector('.mark-completed').addEventListener('click', () => markBooking(b.id, 'completed', card));
   card.querySelector('.mark-noshow').addEventListener('click', () => markBooking(b.id, 'no_show', card));
+  card.querySelector('.mark-edit').addEventListener('click', () => toggleVisitForm(card, b, 'mark'));
+  if (courses.length === 1){
+    card.querySelector('.mark-course').addEventListener('click', () => markBooking(b.id, 'completed', card, {
+      serviceName: b.serviceName,
+      serviceDuration: b.serviceDuration,
+      paid: 0,
+      payType: 'course_visit',
+      courseId: courses[0].id,
+      note: '',
+    }));
+  }
   return card;
 }
 
@@ -823,30 +910,268 @@ function buildHistoryCard(h){
   const statusBadge = h.status === 'completed'
     ? '<span class="status-badge status-done">✅ Выполнено</span>'
     : '<span class="status-badge status-noshow">❌ Не пришёл</span>';
+
+  const a = h.status === 'completed' ? h.actual : null;
+  let factHtml = `<div class="booking-service">${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${(h.servicePrice||0).toLocaleString('ru-RU')} ₽</div>`;
+  if (a){
+    const course = a.courseId ? buildCourses(historyCache).get(a.courseId) : null;
+    const payTag = a.payType === 'single' ? '' :
+      `<span class="pay-tag">🎟 ${escapeHtml(PAY_TYPE_LABELS[a.payType])}${course ? ` «${escapeHtml(course.name)}»` : ''}</span>`;
+    factHtml = `
+      <div class="booking-service">${escapeHtml(a.serviceName)} · ${a.paid.toLocaleString('ru-RU')} ₽ ${payTag}</div>
+      <div class="booked-was">по записи: ${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${(h.servicePrice||0).toLocaleString('ru-RU')} ₽</div>
+      ${a.note ? `<div class="booking-comment">📝 ${escapeHtml(a.note)}</div>` : ''}`;
+  }
+
   card.innerHTML = `
     <div class="booking-top">
       <span class="booking-date">${dateStr}</span>
       <span class="booking-time">${escapeHtml(h.start)}–${escapeHtml(h.end)}</span>
     </div>
-    <div class="booking-service">${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${h.servicePrice.toLocaleString('ru-RU')} ₽</div>
+    ${factHtml}
     ${clientLine(h.clientName, h.clientPhone)}
-    ${statusBadge}
+    <div class="history-card-foot">
+      ${statusBadge}
+      <button class="edit-visit-btn" type="button">✏️ Изменить</button>
+    </div>
   `;
+  card.querySelector('.edit-visit-btn').addEventListener('click', () => toggleVisitForm(card, h, 'edit'));
   return card;
 }
 
-async function markBooking(bookingId, status, card){
+async function markBooking(bookingId, status, card, actual){
   const btns = card.querySelectorAll('.mark-btn');
   btns.forEach(b => b.disabled = true);
   try{
-    await withTimeout(Store.markBooking(bookingId, status), 10000);
+    await withTimeout(Store.markBooking(bookingId, status, actual), 10000);
     // обновить список записей в памяти
     const idx = Store.bookings.findIndex(b => b.id === bookingId);
     if (idx !== -1) Store.bookings.splice(idx, 1);
     renderHistoryTab();
+    return true;
   }catch(e){
     alert('Не удалось сохранить отметку. Попробуйте снова.');
     btns.forEach(b => b.disabled = false);
+    return false;
+  }
+}
+
+// ---------- Форма «как прошёл визит» ----------
+// mode 'mark' — отметка из «ждут отметки» (визит точно состоялся);
+// mode 'edit' — правка визита из истории, можно поменять и статус.
+// Форма раскрывается прямо под карточкой, повторный клик её закрывает.
+function toggleVisitForm(card, entry, mode){
+  const existing = card.querySelector('.visit-form');
+  if (existing){ existing.remove(); return; }
+  card.appendChild(buildVisitForm(entry, mode, card));
+}
+
+function buildVisitForm(entry, mode, card){
+  const a = entry.actual || null;
+  const initialPrice = entry.servicePrice || 0;
+  // В правке своё посещение из остатка исключаем — иначе курс, по которому
+  // этот визит и был, мог бы уже числиться израсходованным и пропасть из списка.
+  const courses = activeCoursesFor(entry.clientPhone, historyCache, mode === 'edit' ? entry.id : null);
+  // Курс текущего визита показываем в списке, даже если он уже закончился.
+  if (a && a.payType === 'course_visit' && !a.course && !courses.some(c => c.id === a.courseId)){
+    const c = buildCourses(historyCache, entry.id).get(a.courseId);
+    if (c) courses.push(c);
+  }
+
+  const form = document.createElement('div');
+  form.className = 'master-form visit-form';
+  form.innerHTML = `
+    ${mode === 'edit' ? `
+    <div class="segmented vf-status">
+      <button type="button" data-status="completed">Пришёл</button>
+      <button type="button" data-status="no_show">Не пришёл</button>
+    </div>` : ''}
+    <div class="vf-completed">
+      <div class="field">
+        <label>Что сделали</label>
+        <input class="vf-service" maxlength="200">
+      </div>
+      <div class="field">
+        <label>Подставить из каталога</label>
+        <select class="vf-catalog">${serviceOptionsHtml().replace('<option value="custom">Другое — указать вручную</option>', '')}</select>
+      </div>
+      <div class="segmented vf-pay">
+        <button type="button" data-pay="single">Разово</button>
+        <button type="button" data-pay="course_sale">Покупка курса</button>
+        <button type="button" data-pay="course_visit">По курсу</button>
+      </div>
+      <div class="vf-sale hidden">
+        <div class="mf-row">
+          <div class="field"><label>Название курса</label><input class="vf-course-name" maxlength="200"></div>
+          <div class="field"><label>Сеансов</label><input class="vf-course-sessions" type="number" min="1" max="100" inputmode="numeric" value="10"></div>
+        </div>
+        <div class="mf-note vf-hint">Этот визит засчитается первым сеансом курса.</div>
+      </div>
+      <div class="vf-cvisit hidden">
+        <div class="field">
+          <label>Курс</label>
+          <select class="vf-course">
+            ${courses.map(c => `<option value="${escapeHtml(c.id)}">«${escapeHtml(c.name)}» — ${courseLeftLabel(c)}</option>`).join('')}
+            <option value="legacy">Курс куплен раньше, до учёта</option>
+          </select>
+        </div>
+        <div class="vf-legacy hidden">
+          <div class="mf-row">
+            <div class="field"><label>Название курса</label><input class="vf-legacy-name" maxlength="200"></div>
+            <div class="field"><label>Всего сеансов</label><input class="vf-legacy-sessions" type="number" min="1" max="100" inputmode="numeric" value="10"></div>
+          </div>
+          <div class="field"><label>Использовано до этого визита</label><input class="vf-legacy-used" type="number" min="0" max="99" inputmode="numeric" value="0"></div>
+          <div class="mf-note vf-hint">Деньги за такой курс пришли до учёта — в выручку он не попадёт.</div>
+        </div>
+      </div>
+      <div class="mf-row">
+        <div class="field"><label class="vf-paid-label">Оплачено, ₽</label><input class="vf-paid" type="number" min="0" max="500000" step="50" inputmode="numeric"></div>
+        <div class="field"><label>Длительность, мин</label><input class="vf-duration" type="number" min="5" max="600" step="5" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label>Комментарий</label><input class="vf-note" maxlength="500" placeholder="Скидка, подарок, что добавили…"></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary vf-save" type="button">Сохранить</button>
+      <button class="btn btn-ghost vf-cancel" type="button">Отмена</button>
+    </div>
+    <div class="save-status vf-status-msg"></div>
+  `;
+
+  const q = (sel) => form.querySelector(sel);
+  const state = { status: entry.status === 'no_show' && mode === 'edit' ? 'no_show' : 'completed', pay: a ? a.payType : 'single' };
+
+  q('.vf-service').value = a ? a.serviceName : entry.serviceName;
+  q('.vf-duration').value = a ? a.serviceDuration : entry.serviceDuration;
+  q('.vf-paid').value = a ? a.paid : initialPrice;
+  q('.vf-note').value = a ? a.note : '';
+  q('.vf-course-name').value = entry.serviceName;
+  q('.vf-legacy-name').value = entry.serviceName;
+  if (a && a.course){
+    if (a.payType === 'course_sale'){
+      q('.vf-course-name').value = a.course.name;
+      q('.vf-course-sessions').value = a.course.sessions;
+    } else {
+      q('.vf-course').value = 'legacy';
+      q('.vf-legacy-name').value = a.course.name;
+      q('.vf-legacy-sessions').value = a.course.sessions;
+      q('.vf-legacy-used').value = a.course.usedBefore;
+    }
+  } else if (a && a.courseId){
+    q('.vf-course').value = a.courseId;
+  }
+  // Курсов у клиента нет — сразу открываем поля «курс до учёта».
+  if (!courses.length) q('.vf-course').value = 'legacy';
+
+  const PAID_LABELS = { single: 'Оплачено, ₽', course_sale: 'Оплачено за курс, ₽', course_visit: 'Доплата, ₽' };
+  const render = () => {
+    form.querySelectorAll('.vf-status button').forEach(b => b.classList.toggle('active', b.dataset.status === state.status));
+    q('.vf-completed').classList.toggle('hidden', state.status !== 'completed');
+    form.querySelectorAll('.vf-pay button').forEach(b => b.classList.toggle('active', b.dataset.pay === state.pay));
+    q('.vf-sale').classList.toggle('hidden', state.pay !== 'course_sale');
+    q('.vf-cvisit').classList.toggle('hidden', state.pay !== 'course_visit');
+    q('.vf-legacy').classList.toggle('hidden', q('.vf-course').value !== 'legacy');
+    q('.vf-paid-label').textContent = PAID_LABELS[state.pay];
+  };
+
+  form.querySelectorAll('.vf-status button').forEach(b => b.addEventListener('click', () => {
+    state.status = b.dataset.status; render();
+  }));
+  form.querySelectorAll('.vf-pay button').forEach(b => b.addEventListener('click', () => {
+    if (state.pay === b.dataset.pay) return;
+    state.pay = b.dataset.pay;
+    // Сумму подставляем под тип оплаты: по курсу обычно 0, курс — вписать заново.
+    q('.vf-paid').value = state.pay === 'course_visit' ? 0 : state.pay === 'course_sale' ? '' : initialPrice;
+    render();
+  }));
+  q('.vf-course').addEventListener('change', render);
+  q('.vf-catalog').addEventListener('change', () => {
+    const svc = getServiceById(q('.vf-catalog').value);
+    if (!svc) return;
+    q('.vf-service').value = svc.name;
+    q('.vf-duration').value = svc.duration;
+    if (state.pay === 'single') q('.vf-paid').value = svc.price;
+    if (state.pay === 'course_sale') q('.vf-course-name').value = svc.name;
+  });
+  q('.vf-cancel').addEventListener('click', () => form.remove());
+  q('.vf-save').addEventListener('click', () => saveVisitForm(form, entry, mode, state, card));
+
+  render();
+  return form;
+}
+
+const VISIT_FIELD_ERRORS = {
+  serviceName: 'Укажите, что сделали',
+  serviceDuration: 'Длительность — от 5 до 600 минут',
+  paid: 'Проверьте сумму',
+  courseName: 'Укажите название курса',
+  courseSessions: 'Сеансов в курсе — от 1 до 100',
+  courseUsedBefore: 'Использовано должно быть меньше, чем сеансов в курсе',
+  courseId: 'Выберите курс',
+};
+
+async function saveVisitForm(form, entry, mode, state, card){
+  const q = (sel) => form.querySelector(sel);
+  const msg = q('.vf-status-msg');
+  const btn = q('.vf-save');
+  const fail = (text) => { msg.textContent = text; msg.style.color = '#B07E7E'; };
+  msg.textContent = '';
+
+  let actual = null;
+  if (state.status === 'completed'){
+    const paidRaw = q('.vf-paid').value.trim();
+    actual = {
+      serviceName: q('.vf-service').value.trim(),
+      serviceDuration: Number(q('.vf-duration').value),
+      paid: paidRaw === '' ? NaN : Number(paidRaw),
+      payType: state.pay,
+      note: q('.vf-note').value.trim(),
+    };
+    if (!actual.serviceName) return fail(VISIT_FIELD_ERRORS.serviceName);
+    if (!Number.isInteger(actual.serviceDuration) || actual.serviceDuration < 5) return fail(VISIT_FIELD_ERRORS.serviceDuration);
+    if (!Number.isFinite(actual.paid) || actual.paid < 0) return fail(state.pay === 'course_sale' ? 'Укажите, сколько заплатили за курс' : VISIT_FIELD_ERRORS.paid);
+
+    if (state.pay === 'course_sale'){
+      actual.course = { name: q('.vf-course-name').value.trim(), sessions: Number(q('.vf-course-sessions').value) };
+    } else if (state.pay === 'course_visit'){
+      if (q('.vf-course').value === 'legacy'){
+        actual.course = {
+          name: q('.vf-legacy-name').value.trim(),
+          sessions: Number(q('.vf-legacy-sessions').value),
+          usedBefore: Number(q('.vf-legacy-used').value || 0),
+        };
+      } else {
+        actual.courseId = q('.vf-course').value;
+      }
+    }
+    if (actual.course){
+      if (!actual.course.name) return fail(VISIT_FIELD_ERRORS.courseName);
+      if (!Number.isInteger(actual.course.sessions) || actual.course.sessions < 1 || actual.course.sessions > 100) return fail(VISIT_FIELD_ERRORS.courseSessions);
+      if (actual.course.usedBefore !== undefined &&
+          (!Number.isInteger(actual.course.usedBefore) || actual.course.usedBefore < 0 || actual.course.usedBefore >= actual.course.sessions)){
+        return fail(VISIT_FIELD_ERRORS.courseUsedBefore);
+      }
+    }
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Сохраняем...';
+  try{
+    if (mode === 'mark'){
+      await withTimeout(Store.markBooking(entry.id, 'completed', actual), 10000);
+      const idx = Store.bookings.findIndex(b => b.id === entry.id);
+      if (idx !== -1) Store.bookings.splice(idx, 1);
+    } else {
+      await withTimeout(Store.editHistoryEntry(entry.id, state.status, actual), 10000);
+    }
+    renderHistoryTab();
+  }catch(e){
+    btn.disabled = false;
+    btn.textContent = 'Сохранить';
+    const m = String(e && e.message);
+    if (m.includes('course-in-use')) return fail('По этому курсу уже есть посещения — сначала поправьте их, потом убирайте курс отсюда');
+    if (m.includes('invalid-actual')) return fail('Проверьте поля формы');
+    if (m.includes('unauthorized')) return fail('Сессия истекла — обновите страницу и войдите снова');
+    fail('Не удалось сохранить. Попробуйте снова.');
   }
 }
 
@@ -960,10 +1285,11 @@ function buildVisitsListHtml(visits){
     const dateStr = d.toLocaleDateString('ru-RU', { day:'2-digit', month:'2-digit', year:'numeric' });
     const dow = d.toLocaleDateString('ru-RU', { weekday:'short' });
     const isNoShow = h.status === 'no_show';
-    const service = disambiguateServiceName(h.serviceName, h.serviceDuration);
+    const service = isNoShow ? disambiguateServiceName(h.serviceName, h.serviceDuration) : visitServiceName(h);
+    const payType = !isNoShow && h.actual ? h.actual.payType : 'single';
     const price = isNoShow
       ? '<span class="visit-noshow-tag">не пришёл</span>'
-      : `${(h.servicePrice||0).toLocaleString('ru-RU')} ₽`;
+      : `${visitPaid(h).toLocaleString('ru-RU')} ₽` + (payType !== 'single' ? ` · 🎟 ${PAY_TYPE_LABELS[payType].toLowerCase()}` : '');
     return `
       <div class="visit-row${isNoShow ? ' noshow' : ''}">
         <div class="visit-when">${escapeHtml(dateStr)}<small>${escapeHtml(dow)}, ${escapeHtml(h.start||'')}</small></div>
@@ -988,6 +1314,16 @@ function buildClientCard(client){
   const noteValue = clientsView.noteDrafts.has(key) ? clientsView.noteDrafts.get(key) : (client.notes || '');
   const toggleLabel = `Все посещения (${visits.length})` + (noShows ? ` · неявок: ${noShows}` : '');
 
+  // Курсы клиента — из той же истории, что и список посещений.
+  const clientCourses = [...buildCourses(visits).values()];
+  const active = clientCourses.filter(c => c.used < c.sessions);
+  const finished = clientCourses.length - active.length;
+  const coursesHtml = clientCourses.length ? `
+    <div class="course-line">
+      ${active.map(c => `🎟 «${escapeHtml(c.name)}» — ${courseLeftLabel(c)}`).join('<br>')}
+      ${finished ? `<div class="course-finished">${active.length ? '' : '🎟 '}Завершённых курсов: ${finished}</div>` : ''}
+    </div>` : '';
+
   const card = document.createElement('div');
   card.className = 'booking-card client-card';
   card.innerHTML = `
@@ -1001,6 +1337,7 @@ function buildClientCard(client){
       <span>Потрачено: <b>${(client.totalSpent||0).toLocaleString('ru-RU')} ₽</b></span>
       <span>Последний: <b>${escapeHtml(client.lastVisit || '—')}</b></span>
     </div>
+    ${coursesHtml}
     <button type="button" class="visits-toggle">
       <span>${toggleLabel}</span>
       <span class="visits-chev${isOpen ? ' open' : ''}">▾</span>
@@ -1147,32 +1484,53 @@ async function renderAnalyticsTab(){
   const completed = history.filter(h => h.status === 'completed');
   const noshow    = history.filter(h => h.status === 'no_show');
 
-  // Считаем по месяцам
+  // Деньги и время — по факту визита (visitPaid/visitDuration): со скидками,
+  // курсами и заменой процедуры. Курсы — по кассе: продажа курса идёт в
+  // выручку целиком в день покупки, посещения по нему — 0 ₽ (или доплата).
+  const payTypeOf = h => h.actual ? h.actual.payType : 'single';
   const byMonth = {};
   completed.forEach(h => {
     const month = h.date.slice(0,7); // YYYY-MM
-    if (!byMonth[month]) byMonth[month] = { visits:0, revenue:0, minutes:0 };
-    byMonth[month].visits++;
-    byMonth[month].revenue += h.servicePrice || 0;
-    byMonth[month].minutes += h.serviceDuration || 0;
+    if (!byMonth[month]) byMonth[month] = { visits:0, revenue:0, minutes:0, courseSales:0, courseVisits:0 };
+    const m = byMonth[month];
+    m.visits++;
+    m.revenue += visitPaid(h);
+    m.minutes += visitDuration(h);
+    if (payTypeOf(h) === 'course_sale') m.courseSales += visitPaid(h);
+    if (payTypeOf(h) === 'course_visit') m.courseVisits++;
   });
 
-  const totalRevenue = completed.reduce((s,h)=>s+(h.servicePrice||0), 0);
-  const totalMinutes = completed.reduce((s,h)=>s+(h.serviceDuration||0), 0);
-  const uniqueClients = new Set(completed.map(h => h.clientPhone.replace(/\D/g,''))).size;
+  const totalRevenue = completed.reduce((s,h)=>s+visitPaid(h), 0);
+  const totalMinutes = completed.reduce((s,h)=>s+visitDuration(h), 0);
+  const uniqueClients = new Set(completed.map(h => phoneTail10(h.clientPhone))).size;
+  const courseSalesSum = completed.filter(h => payTypeOf(h) === 'course_sale').reduce((s,h)=>s+visitPaid(h), 0);
+  const courseVisits = completed.filter(h => payTypeOf(h) === 'course_visit').length;
+  const perVisit = completed.length ? Math.round(totalRevenue / completed.length) : 0;
+  const noshowRate = history.length ? Math.round(noshow.length / history.length * 100) : 0;
+  // Предоплаченные сеансы — сколько визитов ещё «должны» по проданным курсам.
+  const activeCourses = [...buildCourses(history).values()].filter(c => c.used < c.sessions);
+  const prepaidLeft = activeCourses.reduce((s,c)=>s+(c.sessions - c.used), 0);
 
   const months = Object.keys(byMonth).sort().reverse();
   const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
 
   container.innerHTML = `
     <div class="analytics-summary">
+      <div class="analytics-card analytics-card-wide">
+        <div class="analytics-num">${totalRevenue.toLocaleString('ru-RU')} ₽</div>
+        <div class="analytics-label">Всего заработано${courseSalesSum ? ` · из них продажи курсов ${courseSalesSum.toLocaleString('ru-RU')} ₽` : ''}</div>
+      </div>
       <div class="analytics-card">
         <div class="analytics-num">${completed.length}</div>
-        <div class="analytics-label">Выполнено визитов</div>
+        <div class="analytics-label">Выполнено визитов${courseVisits ? `, по курсу ${courseVisits}` : ''}</div>
+      </div>
+      <div class="analytics-card">
+        <div class="analytics-num">${perVisit.toLocaleString('ru-RU')} ₽</div>
+        <div class="analytics-label">Выручка на визит</div>
       </div>
       <div class="analytics-card">
         <div class="analytics-num">${noshow.length}</div>
-        <div class="analytics-label">Не пришли</div>
+        <div class="analytics-label">Не пришли · ${noshowRate}% записей</div>
       </div>
       <div class="analytics-card">
         <div class="analytics-num">${uniqueClients}</div>
@@ -1182,9 +1540,9 @@ async function renderAnalyticsTab(){
         <div class="analytics-num">${Math.floor(totalMinutes/60)} ч ${totalMinutes%60} мин</div>
         <div class="analytics-label">Всего рабочего времени</div>
       </div>
-      <div class="analytics-card analytics-card-wide">
-        <div class="analytics-num">${totalRevenue.toLocaleString('ru-RU')} ₽</div>
-        <div class="analytics-label">Всего заработано</div>
+      <div class="analytics-card">
+        <div class="analytics-num">${prepaidLeft}</div>
+        <div class="analytics-label">Предоплачено сеансов по ${activeCourses.length} ${activeCourses.length === 1 ? 'курсу' : 'курсам'}</div>
       </div>
     </div>
 
@@ -1212,6 +1570,12 @@ async function renderAnalyticsTab(){
           <span>${Math.floor(byMonth[m].minutes/60)} ч ${byMonth[m].minutes%60} мин</span>
           <span>${byMonth[m].revenue.toLocaleString('ru-RU')} ₽</span>
         </div>
+        ${byMonth[m].courseSales || byMonth[m].courseVisits ? `
+        <div class="monthly-sub">
+          ${byMonth[m].courseSales ? `курсы проданы на ${byMonth[m].courseSales.toLocaleString('ru-RU')} ₽` : ''}
+          ${byMonth[m].courseSales && byMonth[m].courseVisits ? ' · ' : ''}
+          ${byMonth[m].courseVisits ? `по курсу ${byMonth[m].courseVisits} виз.` : ''}
+        </div>` : ''}
       `;
       table.appendChild(row);
     });
