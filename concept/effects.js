@@ -210,10 +210,15 @@
     const card = e.target.closest('.service');
     if (!card || !AROMAS[card.dataset.id]) return;
     if (!e.target.closest('.spa-toggle, .service-row')) return;
+    // Вспорх — только когда что-то включили: выбрали программу или раскрыли
+    // описание. Снятие выбора и сворачивание проходят тихо, даже если
+    // карточка после них остаётся «в фокусе».
+    const before = { selected: card.classList.contains('selected'), open: isOpen(card) };
     setTimeout(() => {
       if (isEngaged(card)){
         setAroma(AROMAS[card.dataset.id], card);
-        burst(card, AROMAS[card.dataset.id]);
+        const turnedOn = (card.classList.contains('selected') && !before.selected) || (isOpen(card) && !before.open);
+        if (turnedOn) burst(card, AROMAS[card.dataset.id]);
       } else if (card.classList.contains('aroma-on')){
         const spa = [...document.querySelectorAll('.service')].filter(el => el !== card && AROMAS[el.dataset.id]);
         const other = spa.find(el => el.classList.contains('selected')) || spa.find(isEngaged);
@@ -253,10 +258,14 @@
     }
   }
 
+  function isOpen(card){
+    const details = card.querySelector('.spa-details');
+    return !!details && !details.classList.contains('hidden');
+  }
+
   // Программа «в фокусе»: выбрана для записи или раскрыто её описание.
   function isEngaged(card){
-    const details = card.querySelector('.spa-details');
-    return card.classList.contains('selected') || (details && !details.classList.contains('hidden'));
+    return card.classList.contains('selected') || isOpen(card);
   }
 
   // ---------- Появление блоков ----------
