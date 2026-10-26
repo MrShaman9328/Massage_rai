@@ -198,6 +198,20 @@ const Store = {
     await callApi('editHistoryEntry', { bookingId, status, ...(actual ? { actual } : {}) });
   },
 
+  async getCourses(){
+    const data = await callApi('getCourses');
+    return data.courses || [];
+  },
+
+  async saveCourse(course){
+    const data = await callApi('saveCourse', { course });
+    return data.course;
+  },
+
+  async deleteCourse(courseId){
+    await callApi('deleteCourse', { courseId });
+  },
+
   async getHistory(){
     const data = await callApi('getHistory');
     return data.history || [];
@@ -558,7 +572,8 @@ function renderBookingsList(){
       </div>
       ${isReserve
         ? `<div class="booking-service">🔒 Резерв — время занято</div>`
-        : `<div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽</div>
+        : `<div class="booking-service">${escapeHtml(disambiguateServiceName(b.serviceName, b.serviceDuration))} · ${b.servicePrice.toLocaleString('ru-RU')} ₽${b.courseId ? ' <span class="pay-tag">🎟 по курсу</span>' : ''}</div>
+      ${b.courseId ? `<div class="course-line">🎟 «${escapeHtml(b.courseName || '')}»${b.servicePrice ? ` · доплата ${b.servicePrice.toLocaleString('ru-RU')} ₽` : ' · оплачено курсом'}</div>` : ''}
       ${clientLine(b.clientName, b.clientPhone)}`}
       ${b.comment ? `<div class="booking-comment">💬 ${escapeHtml(b.comment)}</div>` : ''}
       ${b.clientNotes ? `<div class="booking-comment client-note">📌 ${escapeHtml(b.clientNotes)}</div>` : ''}
@@ -688,6 +703,7 @@ const MONTH_FULL_RU = ['Январь','Февраль','Март','Апрель'
 
 let historyMonthOffset = 0; // 0 = текущий месяц, -1 = предыдущий, и т.д.
 let historyCache = [];      // последняя загруженная история — для остатков по курсам
+let coursesCache = [];      // курсы из courses.json — грузятся вместе с историей
 
 // ============================================================
 // ВИЗИТ ПО ФАКТУ И КУРСЫ
@@ -695,7 +711,11 @@ let historyCache = [];      // последняя загруженная ист�
 // В истории рядом с записью может лежать actual — как визит прошёл на самом
 // деле (подробности — в index.js у validateVisitActual). Всё, что считает
 // деньги и время, читает визит через эти функции, а не напрямую.
-const PAY_TYPE_LABELS = { single: 'Разовая оплата', course_sale: 'Покупка курса', course_visit: 'По курсу' };
+//
+// Курсы — отдельные записи (courses.json), визиты и брони ссылаются на них
+// через courseId. Остаток не хранится, а считается здесь так же, как на
+// сервере (courseLeft в index.js): всего − использовано до учёта −
+// выполненные визиты по курсу − предстоящие записи по курсу.
 
 function visitPaid(h){
   if (h.status !== 'completed') return 0;
@@ -707,41 +727,57 @@ function visitServiceName(h){
 function visitDuration(h){
   return h.actual ? (h.actual.serviceDuration || 0) : (h.serviceDuration || 0);
 }
-
-// Курсы целиком выводятся из истории: курс заводит визит с actual.course,
-// посещения ссылаются на него через actual.courseId. excludeId — визит,
-// который сейчас правят: его собственное посещение в остаток не считаем,
-// иначе при правке курс выглядел бы на один сеанс «использованнее».
-function buildCourses(history, excludeId){
-  const courses = new Map();
-  history.forEach(h => {
-    if (!h.actual || !h.actual.course) return;
-    courses.set(h.actual.courseId, {
-      id: h.actual.courseId,
-      name: h.actual.course.name,
-      sessions: h.actual.course.sessions,
-      used: h.actual.course.usedBefore || 0,
-      tail: phoneTail10(h.clientPhone),
-      boughtAt: h.date,
-    });
-  });
-  history.forEach(h => {
-    if (h.id === excludeId || h.status !== 'completed' || !h.actual || !h.actual.courseId) return;
-    const c = courses.get(h.actual.courseId);
-    if (c) c.used++;
-  });
-  return courses;
+function visitCourseId(h){
+  return h.actual ? (h.actual.courseId || null) : (h.courseId || null);
 }
 
-function activeCoursesFor(phone, history, excludeId){
+// excludeId — визит или бронь, которую сейчас отмечают или правят: её саму
+// в расход не считаем, иначе курс выглядел бы на один сеанс «использованнее».
+function courseUsage(course, excludeId){
+  const done = historyCache.filter(h => h.id !== excludeId && h.status === 'completed' && visitCourseId(h) === course.id).length;
+  const booked = Store.bookings.filter(b => b.id !== excludeId && b.courseId === course.id).length;
+  const left = course.closedAt ? 0 : course.sessions - (course.usedBefore || 0) - done - booked;
+  return { done, booked, left };
+}
+
+function coursesOfClient(phone){
   const tail = phoneTail10(phone);
-  return [...buildCourses(history, excludeId).values()]
-    .filter(c => c.tail === tail && c.used < c.sessions)
-    .sort((a, b) => a.boughtAt.localeCompare(b.boughtAt));
+  return coursesCache.filter(c => phoneTail10(c.phone) === tail)
+    .sort((a, b) => (a.paidAt || '').localeCompare(b.paidAt || ''));
 }
 
-function courseLeftLabel(c){
-  return `осталось ${c.sessions - c.used} из ${c.sessions}`;
+function activeCoursesFor(phone, excludeId){
+  return coursesOfClient(phone).filter(c => courseUsage(c, excludeId).left > 0);
+}
+
+function courseById(id){
+  return coursesCache.find(c => c.id === id) || null;
+}
+
+function courseLeftLabel(course, excludeId){
+  return `осталось ${Math.max(0, courseUsage(course, excludeId).left)} из ${course.sessions}`;
+}
+
+// Курс, под который подходит бронь без courseId: старая запись или курс
+// заведён уже после записи. Сверяем по id услуг, а для записей без них —
+// по названию из каталога.
+function matchCourseForBooking(b){
+  const ids = (b.serviceItems || []).map(it => it.id);
+  const names = String(b.serviceName || '').split(', ');
+  return activeCoursesFor(b.clientPhone, b.id).find(c => {
+    if (!c.serviceId) return false;
+    if (ids.length) return ids.includes(c.serviceId);
+    const svc = getServiceById(c.serviceId);
+    return svc && names.includes(svc.name) && (names.length > 1 || svc.duration === b.serviceDuration);
+  }) || null;
+}
+
+// Сколько из цены брони приходится на услугу курса — остальное доплата.
+function coursePartOfBooking(b, course){
+  const item = (b.serviceItems || []).find(it => it.id === course.serviceId);
+  if (item) return item.price;
+  const svc = getServiceById(course.serviceId);
+  return svc ? Math.min(svc.price, b.servicePrice || 0) : (b.servicePrice || 0);
 }
 
 function getHistoryMonthKey(offset){
@@ -756,7 +792,7 @@ async function renderHistoryTab(){
   container.innerHTML = '<div class="empty-state">Загружаем...</div>';
 
   let history = [];
-  try{ history = await Store.getHistory(); }
+  try{ [history, coursesCache] = await Promise.all([Store.getHistory(), Store.getCourses()]); }
   catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
   historyCache = history;
 
@@ -859,15 +895,19 @@ function buildWaitingCard(b){
     return card;
   }
 
-  // Активный курс клиента — сразу на карточке: так «пришёл по курсу»
-  // отмечается в одно касание, без формы. Курсов несколько — выбор в форме.
-  const courses = activeCoursesFor(b.clientPhone, historyCache);
-  const courseLine = courses.length
-    ? `<div class="course-line">🎟 ${courses.map(c => `«${escapeHtml(c.name)}» — ${courseLeftLabel(c)}`).join('<br>🎟 ')}</div>`
-    : '';
-  const courseBtn = courses.length === 1
-    ? `<button class="mark-btn mark-course">🎟 По курсу</button>`
-    : '';
+  // Бронь по курсу (сервер привязал её при записи) — «Пришла» и так значит
+  // «по курсу». Бронь без курса, но у клиентки есть подходящий — кнопка
+  // «По курсу» в одно касание. В остальных случаях — обычная цена.
+  const bookedCourse = b.courseId ? courseById(b.courseId) : null;
+  const suggested = !b.courseId ? matchCourseForBooking(b) : null;
+  let courseLine = '';
+  if (bookedCourse){
+    courseLine = `<div class="course-line">🎟 По курсу «${escapeHtml(bookedCourse.name)}» — после визита ${courseLeftLabel(bookedCourse)}${b.servicePrice ? ` · доплата ${b.servicePrice.toLocaleString('ru-RU')} ₽` : ''}</div>`;
+  } else if (b.courseId){
+    courseLine = `<div class="course-line">🎟 По курсу «${escapeHtml(b.courseName || '')}»</div>`;
+  } else if (suggested){
+    courseLine = `<div class="course-line">🎟 Есть курс «${escapeHtml(suggested.name)}» — ${courseLeftLabel(suggested, b.id)}</div>`;
+  }
 
   card.innerHTML = `
     <div class="booking-top">
@@ -878,24 +918,24 @@ function buildWaitingCard(b){
     ${clientLine(b.clientName, b.clientPhone)}
     ${courseLine}
     <div class="mark-actions">
-      <button class="mark-btn mark-completed">✅ Пришёл</button>
+      <button class="mark-btn mark-completed">${b.courseId ? '✅ Пришёл по курсу' : '✅ Пришёл'}</button>
       <button class="mark-btn mark-noshow">❌ Не пришёл</button>
     </div>
     <div class="mark-actions">
-      ${courseBtn}
+      ${suggested ? '<button class="mark-btn mark-course">🎟 По курсу</button>' : ''}
       <button class="mark-btn mark-edit">✏️ Пришёл, с правками</button>
     </div>
   `;
   card.querySelector('.mark-completed').addEventListener('click', () => markBooking(b.id, 'completed', card));
   card.querySelector('.mark-noshow').addEventListener('click', () => markBooking(b.id, 'no_show', card));
   card.querySelector('.mark-edit').addEventListener('click', () => toggleVisitForm(card, b, 'mark'));
-  if (courses.length === 1){
+  if (suggested){
     card.querySelector('.mark-course').addEventListener('click', () => markBooking(b.id, 'completed', card, {
       serviceName: b.serviceName,
       serviceDuration: b.serviceDuration,
-      paid: 0,
+      paid: Math.max(0, (b.servicePrice || 0) - coursePartOfBooking(b, suggested)),
       payType: 'course_visit',
-      courseId: courses[0].id,
+      courseId: suggested.id,
       note: '',
     }));
   }
@@ -912,14 +952,17 @@ function buildHistoryCard(h){
     : '<span class="status-badge status-noshow">❌ Не пришёл</span>';
 
   const a = h.status === 'completed' ? h.actual : null;
-  let factHtml = `<div class="booking-service">${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${(h.servicePrice||0).toLocaleString('ru-RU')} ₽</div>`;
+  const courseId = h.status === 'completed' ? visitCourseId(h) : null;
+  const course = courseId ? courseById(courseId) : null;
+  const payTag = courseId
+    ? `<span class="pay-tag">🎟 по курсу${course ? ` «${escapeHtml(course.name)}»` : ''}</span>`
+    : '';
+  const bookedLabel = `${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${(h.servicePrice||0).toLocaleString('ru-RU')} ₽`;
+  let factHtml = `<div class="booking-service">${bookedLabel} ${payTag}</div>`;
   if (a){
-    const course = a.courseId ? buildCourses(historyCache).get(a.courseId) : null;
-    const payTag = a.payType === 'single' ? '' :
-      `<span class="pay-tag">🎟 ${escapeHtml(PAY_TYPE_LABELS[a.payType])}${course ? ` «${escapeHtml(course.name)}»` : ''}</span>`;
     factHtml = `
       <div class="booking-service">${escapeHtml(a.serviceName)} · ${a.paid.toLocaleString('ru-RU')} ₽ ${payTag}</div>
-      <div class="booked-was">по записи: ${escapeHtml(disambiguateServiceName(h.serviceName, h.serviceDuration))} · ${(h.servicePrice||0).toLocaleString('ru-RU')} ₽</div>
+      <div class="booked-was">по записи: ${bookedLabel}${h.courseId ? ' (по курсу)' : ''}</div>
       ${a.note ? `<div class="booking-comment">📝 ${escapeHtml(a.note)}</div>` : ''}`;
   }
 
@@ -966,17 +1009,39 @@ function toggleVisitForm(card, entry, mode){
   card.appendChild(buildVisitForm(entry, mode, card));
 }
 
+// Услуга каталога для брони: из serviceItems, а для старых записей — по
+// названию и длительности. Нужна, чтобы подставить её в «Купила курс».
+function catalogIdOfBooking(b){
+  if (b.serviceItems && b.serviceItems.length === 1) return b.serviceItems[0].id;
+  for (const cat of SERVICE_CATEGORIES){
+    const svc = cat.services.find(s => s.name === b.serviceName && s.duration === b.serviceDuration);
+    if (svc) return svc.id;
+  }
+  return '';
+}
+
+function courseServiceOptionsHtml(){
+  return serviceOptionsHtml()
+    .replace('<option value="">Выберите услугу</option>', '<option value="">Без привязки к услуге</option>')
+    .replace('<option value="custom">Другое — указать вручную</option>', '');
+}
+
 function buildVisitForm(entry, mode, card){
   const a = entry.actual || null;
-  const initialPrice = entry.servicePrice || 0;
-  // В правке своё посещение из остатка исключаем — иначе курс, по которому
-  // этот визит и был, мог бы уже числиться израсходованным и пропасть из списка.
-  const courses = activeCoursesFor(entry.clientPhone, historyCache, mode === 'edit' ? entry.id : null);
-  // Курс текущего визита показываем в списке, даже если он уже закончился.
-  if (a && a.payType === 'course_visit' && !a.course && !courses.some(c => c.id === a.courseId)){
-    const c = buildCourses(historyCache, entry.id).get(a.courseId);
-    if (c) courses.push(c);
-  }
+  const fullPrice = (entry.servicePrice || 0) + (entry.coursePrice || 0);
+  const suggested = mode === 'mark' && !entry.courseId ? matchCourseForBooking(entry) : null;
+
+  // Курсы для выбора: активные у клиентки плюс тот, по которому визит уже
+  // числится (даже если он с этим визитом закончился).
+  const currentCourseId = a ? a.courseId : entry.courseId;
+  const courses = activeCoursesFor(entry.clientPhone, entry.id);
+  const current = currentCourseId ? courseById(currentCourseId) : null;
+  if (current && !courses.includes(current)) courses.unshift(current);
+  const defaultCourse = current || suggested || courses[0] || null;
+  // Доплата по курсу: всё, что в брони сверх услуги курса.
+  const extraFor = (course) => !course ? 0
+    : entry.courseId === course.id ? (entry.servicePrice || 0)
+    : Math.max(0, fullPrice - coursePartOfBooking(entry, course));
 
   const form = document.createElement('div');
   form.className = 'master-form visit-form';
@@ -997,35 +1062,33 @@ function buildVisitForm(entry, mode, card){
       </div>
       <div class="segmented vf-pay">
         <button type="button" data-pay="single">Разово</button>
-        <button type="button" data-pay="course_sale">Покупка курса</button>
         <button type="button" data-pay="course_visit">По курсу</button>
+        <button type="button" data-pay="new_course">Купила курс</button>
       </div>
-      <div class="vf-sale hidden">
+      <div class="vf-cvisit hidden">
+        ${courses.length ? `
+        <div class="field">
+          <label>Курс</label>
+          <select class="vf-course">
+            ${courses.map(c => `<option value="${escapeHtml(c.id)}">«${escapeHtml(c.name)}» — ${courseLeftLabel(c, entry.id)}</option>`).join('')}
+          </select>
+        </div>` : `
+        <div class="mf-note vf-hint">У клиентки нет курса с остатком. Если купила сейчас — «Купила курс»; если раньше — добавьте курс в её карточке.</div>`}
+      </div>
+      <div class="vf-newcourse hidden">
+        <div class="field">
+          <label>Услуга курса</label>
+          <select class="vf-course-service">${courseServiceOptionsHtml()}</select>
+        </div>
         <div class="mf-row">
           <div class="field"><label>Название курса</label><input class="vf-course-name" maxlength="200"></div>
           <div class="field"><label>Сеансов</label><input class="vf-course-sessions" type="number" min="1" max="100" inputmode="numeric" value="10"></div>
         </div>
+        <div class="field"><label>Оплачено за курс, ₽</label><input class="vf-course-paid" type="number" min="0" max="500000" step="50" inputmode="numeric"></div>
         <div class="mf-note vf-hint">Этот визит засчитается первым сеансом курса.</div>
       </div>
-      <div class="vf-cvisit hidden">
-        <div class="field">
-          <label>Курс</label>
-          <select class="vf-course">
-            ${courses.map(c => `<option value="${escapeHtml(c.id)}">«${escapeHtml(c.name)}» — ${courseLeftLabel(c)}</option>`).join('')}
-            <option value="legacy">Курс куплен раньше, до учёта</option>
-          </select>
-        </div>
-        <div class="vf-legacy hidden">
-          <div class="mf-row">
-            <div class="field"><label>Название курса</label><input class="vf-legacy-name" maxlength="200"></div>
-            <div class="field"><label>Всего сеансов</label><input class="vf-legacy-sessions" type="number" min="1" max="100" inputmode="numeric" value="10"></div>
-          </div>
-          <div class="field"><label>Использовано до этого визита</label><input class="vf-legacy-used" type="number" min="0" max="99" inputmode="numeric" value="0"></div>
-          <div class="mf-note vf-hint">Деньги за такой курс пришли до учёта — в выручку он не попадёт.</div>
-        </div>
-      </div>
       <div class="mf-row">
-        <div class="field"><label class="vf-paid-label">Оплачено, ₽</label><input class="vf-paid" type="number" min="0" max="500000" step="50" inputmode="numeric"></div>
+        <div class="field"><label class="vf-paid-label">Оплачено, ₽</label><input class="vf-paid" type="number" min="0" max="100000" step="50" inputmode="numeric"></div>
         <div class="field"><label>Длительность, мин</label><input class="vf-duration" type="number" min="5" max="600" step="5" inputmode="numeric"></div>
       </div>
       <div class="field"><label>Комментарий</label><input class="vf-note" maxlength="500" placeholder="Скидка, подарок, что добавили…"></div>
@@ -1038,38 +1101,25 @@ function buildVisitForm(entry, mode, card){
   `;
 
   const q = (sel) => form.querySelector(sel);
-  const state = { status: entry.status === 'no_show' && mode === 'edit' ? 'no_show' : 'completed', pay: a ? a.payType : 'single' };
+  const initialPay = a ? a.payType : (entry.courseId || suggested ? 'course_visit' : 'single');
+  const state = { status: entry.status === 'no_show' && mode === 'edit' ? 'no_show' : 'completed', pay: initialPay };
 
   q('.vf-service').value = a ? a.serviceName : entry.serviceName;
   q('.vf-duration').value = a ? a.serviceDuration : entry.serviceDuration;
-  q('.vf-paid').value = a ? a.paid : initialPrice;
+  q('.vf-paid').value = a ? a.paid : (initialPay === 'course_visit' ? extraFor(defaultCourse) : fullPrice);
   q('.vf-note').value = a ? a.note : '';
+  if (q('.vf-course') && defaultCourse) q('.vf-course').value = defaultCourse.id;
+  q('.vf-course-service').value = catalogIdOfBooking(entry);
   q('.vf-course-name').value = entry.serviceName;
-  q('.vf-legacy-name').value = entry.serviceName;
-  if (a && a.course){
-    if (a.payType === 'course_sale'){
-      q('.vf-course-name').value = a.course.name;
-      q('.vf-course-sessions').value = a.course.sessions;
-    } else {
-      q('.vf-course').value = 'legacy';
-      q('.vf-legacy-name').value = a.course.name;
-      q('.vf-legacy-sessions').value = a.course.sessions;
-      q('.vf-legacy-used').value = a.course.usedBefore;
-    }
-  } else if (a && a.courseId){
-    q('.vf-course').value = a.courseId;
-  }
-  // Курсов у клиента нет — сразу открываем поля «курс до учёта».
-  if (!courses.length) q('.vf-course').value = 'legacy';
+  q('.vf-course-paid').value = '';
 
-  const PAID_LABELS = { single: 'Оплачено, ₽', course_sale: 'Оплачено за курс, ₽', course_visit: 'Доплата, ₽' };
+  const PAID_LABELS = { single: 'Оплачено, ₽', course_visit: 'Доплата за визит, ₽', new_course: 'Доплата за визит, ₽' };
   const render = () => {
     form.querySelectorAll('.vf-status button').forEach(b => b.classList.toggle('active', b.dataset.status === state.status));
     q('.vf-completed').classList.toggle('hidden', state.status !== 'completed');
     form.querySelectorAll('.vf-pay button').forEach(b => b.classList.toggle('active', b.dataset.pay === state.pay));
-    q('.vf-sale').classList.toggle('hidden', state.pay !== 'course_sale');
     q('.vf-cvisit').classList.toggle('hidden', state.pay !== 'course_visit');
-    q('.vf-legacy').classList.toggle('hidden', q('.vf-course').value !== 'legacy');
+    q('.vf-newcourse').classList.toggle('hidden', state.pay !== 'new_course');
     q('.vf-paid-label').textContent = PAID_LABELS[state.pay];
   };
 
@@ -1079,21 +1129,29 @@ function buildVisitForm(entry, mode, card){
   form.querySelectorAll('.vf-pay button').forEach(b => b.addEventListener('click', () => {
     if (state.pay === b.dataset.pay) return;
     state.pay = b.dataset.pay;
-    // Сумму подставляем под тип оплаты: по курсу обычно 0, курс — вписать заново.
-    q('.vf-paid').value = state.pay === 'course_visit' ? 0 : state.pay === 'course_sale' ? '' : initialPrice;
+    // Сумму за визит подставляем под тип оплаты: разово — полная цена,
+    // по курсу — только то, что сверх курса, при покупке курса — 0.
+    q('.vf-paid').value = state.pay === 'single' ? fullPrice
+      : state.pay === 'course_visit' ? extraFor(q('.vf-course') ? courseById(q('.vf-course').value) : null)
+      : 0;
     render();
   }));
-  q('.vf-course').addEventListener('change', render);
+  if (q('.vf-course')) q('.vf-course').addEventListener('change', () => {
+    q('.vf-paid').value = extraFor(courseById(q('.vf-course').value));
+  });
+  q('.vf-course-service').addEventListener('change', () => {
+    const svc = getServiceById(q('.vf-course-service').value);
+    if (svc) q('.vf-course-name').value = svc.name;
+  });
   q('.vf-catalog').addEventListener('change', () => {
     const svc = getServiceById(q('.vf-catalog').value);
     if (!svc) return;
     q('.vf-service').value = svc.name;
     q('.vf-duration').value = svc.duration;
     if (state.pay === 'single') q('.vf-paid').value = svc.price;
-    if (state.pay === 'course_sale') q('.vf-course-name').value = svc.name;
   });
   q('.vf-cancel').addEventListener('click', () => form.remove());
-  q('.vf-save').addEventListener('click', () => saveVisitForm(form, entry, mode, state, card));
+  q('.vf-save').addEventListener('click', () => saveVisitForm(form, entry, mode, state));
 
   render();
   return form;
@@ -1105,11 +1163,11 @@ const VISIT_FIELD_ERRORS = {
   paid: 'Проверьте сумму',
   courseName: 'Укажите название курса',
   courseSessions: 'Сеансов в курсе — от 1 до 100',
-  courseUsedBefore: 'Использовано должно быть меньше, чем сеансов в курсе',
+  coursePaid: 'Укажите, сколько заплатили за курс (0 — если ещё не платила)',
   courseId: 'Выберите курс',
 };
 
-async function saveVisitForm(form, entry, mode, state, card){
+async function saveVisitForm(form, entry, mode, state){
   const q = (sel) => form.querySelector(sel);
   const msg = q('.vf-status-msg');
   const btn = q('.vf-save');
@@ -1122,34 +1180,30 @@ async function saveVisitForm(form, entry, mode, state, card){
     actual = {
       serviceName: q('.vf-service').value.trim(),
       serviceDuration: Number(q('.vf-duration').value),
-      paid: paidRaw === '' ? NaN : Number(paidRaw),
-      payType: state.pay,
+      paid: paidRaw === '' ? 0 : Number(paidRaw),
+      payType: state.pay === 'single' ? 'single' : 'course_visit',
       note: q('.vf-note').value.trim(),
     };
     if (!actual.serviceName) return fail(VISIT_FIELD_ERRORS.serviceName);
     if (!Number.isInteger(actual.serviceDuration) || actual.serviceDuration < 5) return fail(VISIT_FIELD_ERRORS.serviceDuration);
-    if (!Number.isFinite(actual.paid) || actual.paid < 0) return fail(state.pay === 'course_sale' ? 'Укажите, сколько заплатили за курс' : VISIT_FIELD_ERRORS.paid);
+    if (!Number.isFinite(actual.paid) || actual.paid < 0) return fail(VISIT_FIELD_ERRORS.paid);
 
-    if (state.pay === 'course_sale'){
-      actual.course = { name: q('.vf-course-name').value.trim(), sessions: Number(q('.vf-course-sessions').value) };
-    } else if (state.pay === 'course_visit'){
-      if (q('.vf-course').value === 'legacy'){
-        actual.course = {
-          name: q('.vf-legacy-name').value.trim(),
-          sessions: Number(q('.vf-legacy-sessions').value),
-          usedBefore: Number(q('.vf-legacy-used').value || 0),
-        };
-      } else {
-        actual.courseId = q('.vf-course').value;
-      }
-    }
-    if (actual.course){
-      if (!actual.course.name) return fail(VISIT_FIELD_ERRORS.courseName);
-      if (!Number.isInteger(actual.course.sessions) || actual.course.sessions < 1 || actual.course.sessions > 100) return fail(VISIT_FIELD_ERRORS.courseSessions);
-      if (actual.course.usedBefore !== undefined &&
-          (!Number.isInteger(actual.course.usedBefore) || actual.course.usedBefore < 0 || actual.course.usedBefore >= actual.course.sessions)){
-        return fail(VISIT_FIELD_ERRORS.courseUsedBefore);
-      }
+    if (state.pay === 'course_visit'){
+      if (!q('.vf-course')) return fail(VISIT_FIELD_ERRORS.courseId);
+      actual.courseId = q('.vf-course').value;
+    } else if (state.pay === 'new_course'){
+      const coursePaidRaw = q('.vf-course-paid').value.trim();
+      actual.newCourse = {
+        name: q('.vf-course-name').value.trim(),
+        serviceId: q('.vf-course-service').value || null,
+        sessions: Number(q('.vf-course-sessions').value),
+        usedBefore: 0,
+        paid: Number(coursePaidRaw),
+        note: '',
+      };
+      if (!actual.newCourse.name) return fail(VISIT_FIELD_ERRORS.courseName);
+      if (!Number.isInteger(actual.newCourse.sessions) || actual.newCourse.sessions < 1 || actual.newCourse.sessions > 100) return fail(VISIT_FIELD_ERRORS.courseSessions);
+      if (coursePaidRaw === '' || !Number.isFinite(actual.newCourse.paid) || actual.newCourse.paid < 0) return fail(VISIT_FIELD_ERRORS.coursePaid);
     }
   }
 
@@ -1168,7 +1222,6 @@ async function saveVisitForm(form, entry, mode, state, card){
     btn.disabled = false;
     btn.textContent = 'Сохранить';
     const m = String(e && e.message);
-    if (m.includes('course-in-use')) return fail('По этому курсу уже есть посещения — сначала поправьте их, потом убирайте курс отсюда');
     if (m.includes('invalid-actual')) return fail('Проверьте поля формы');
     if (m.includes('unauthorized')) return fail('Сессия истекла — обновите страницу и войдите снова');
     fail('Не удалось сохранить. Попробуйте снова.');
@@ -1209,8 +1262,8 @@ async function renderClientsTab(){
   let clients = {};
   let history = [];
   try{
-    // Историю берём тем же action, что и вкладка «История» — бэкенд не трогаем.
-    [clients, history] = await Promise.all([Store.getClients(), Store.getHistory()]);
+    [clients, history, coursesCache] = await Promise.all([Store.getClients(), Store.getHistory(), Store.getCourses()]);
+    historyCache = history;
   }catch(e){
     container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>';
     return;
@@ -1286,16 +1339,163 @@ function buildVisitsListHtml(visits){
     const dow = d.toLocaleDateString('ru-RU', { weekday:'short' });
     const isNoShow = h.status === 'no_show';
     const service = isNoShow ? disambiguateServiceName(h.serviceName, h.serviceDuration) : visitServiceName(h);
-    const payType = !isNoShow && h.actual ? h.actual.payType : 'single';
     const price = isNoShow
       ? '<span class="visit-noshow-tag">не пришёл</span>'
-      : `${visitPaid(h).toLocaleString('ru-RU')} ₽` + (payType !== 'single' ? ` · 🎟 ${PAY_TYPE_LABELS[payType].toLowerCase()}` : '');
+      : `${visitPaid(h).toLocaleString('ru-RU')} ₽` + (visitCourseId(h) ? ' · 🎟 по курсу' : '');
     return `
       <div class="visit-row${isNoShow ? ' noshow' : ''}">
         <div class="visit-when">${escapeHtml(dateStr)}<small>${escapeHtml(dow)}, ${escapeHtml(h.start||'')}</small></div>
         <div class="visit-what"><b>${escapeHtml(service)}</b><br>${price}</div>
       </div>`;
   }).join('');
+}
+
+// ---------- Курсы в карточке клиентки ----------
+// Курс можно завести без визита: оплатила переводом, купила до учёта.
+// Дальше записи на услугу курса сервер сам помечает «по курсу».
+function renderClientCourses(box, client){
+  const courses = coursesOfClient(client.phone);
+  const rows = courses.map(c => {
+    const u = courseUsage(c);
+    let state;
+    if (c.closedAt) state = 'закрыт';
+    else if (u.left <= 0 && u.booked) state = `свободных сеансов нет · записана ещё на ${u.booked}`;
+    else if (u.left <= 0) state = `использован, ${c.sessions} из ${c.sessions}`;
+    else state = `осталось ${u.left} из ${c.sessions}` + (u.booked ? ` · записана ещё на ${u.booked}` : '');
+    const inactive = c.closedAt || u.left <= 0;
+    return `
+      <div class="course-row${inactive ? ' inactive' : ''}">
+        <span>🎟 «${escapeHtml(c.name)}» — ${state}</span>
+        <button type="button" class="course-edit-btn" data-id="${escapeHtml(c.id)}">✏️</button>
+      </div>`;
+  }).join('');
+  box.innerHTML = `
+    ${rows}
+    <button type="button" class="course-add-btn">＋ Добавить курс</button>
+    <div class="course-form-slot"></div>
+  `;
+  const slot = box.querySelector('.course-form-slot');
+  const open = (course) => {
+    if (slot.firstChild && slot.firstChild.dataset.courseId === (course ? course.id : 'new')){
+      slot.innerHTML = '';
+      return;
+    }
+    slot.innerHTML = '';
+    slot.appendChild(buildCourseForm(client, course));
+  };
+  box.querySelector('.course-add-btn').addEventListener('click', () => open(null));
+  box.querySelectorAll('.course-edit-btn').forEach(btn =>
+    btn.addEventListener('click', () => open(courseById(btn.dataset.id))));
+}
+
+function newCourseId(){
+  const rnd = crypto.randomUUID ? crypto.randomUUID().replace(/-/g, '') : Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+  return 'c_' + rnd;
+}
+
+function buildCourseForm(client, course){
+  const form = document.createElement('div');
+  form.className = 'master-form course-form';
+  form.dataset.courseId = course ? course.id : 'new';
+  // id нового курса создаём один раз на форму — повтор после сбоя сети
+  // перезапишет тот же курс, а не заведёт второй.
+  const id = course ? course.id : newCourseId();
+  const usage = course ? courseUsage(course) : null;
+  form.innerHTML = `
+    <div class="field">
+      <label>Услуга курса</label>
+      <select class="cf-service">${courseServiceOptionsHtml()}</select>
+    </div>
+    <div class="field"><label>Название</label><input class="cf-name" maxlength="200"></div>
+    <div class="mf-row">
+      <div class="field"><label>Сеансов</label><input class="cf-sessions" type="number" min="1" max="100" inputmode="numeric"></div>
+      <div class="field"><label>Использовано до учёта</label><input class="cf-used" type="number" min="0" max="99" inputmode="numeric"></div>
+    </div>
+    <div class="mf-row">
+      <div class="field"><label>Оплачено, ₽</label><input class="cf-paid" type="number" min="0" max="500000" step="50" inputmode="numeric"></div>
+      <div class="field"><label>Дата оплаты</label><input class="cf-paid-at" type="date"></div>
+    </div>
+    <div class="field"><label>Комментарий</label><input class="cf-note" maxlength="500" placeholder="Необязательно"></div>
+    ${usage ? `<div class="mf-note vf-hint">По курсу уже ${usage.done} ${usage.done === 1 ? 'визит' : 'визитов'} в истории${usage.booked ? `, записей вперёд: ${usage.booked}` : ''}.</div>` : `
+    <div class="mf-note vf-hint">Если деньги за курс пришли до учёта и уже есть в старой выручке — поставьте 0, чтобы не посчитать их дважды.</div>`}
+    ${course ? '<label class="mf-check"><input type="checkbox" class="cf-closed"> Закрыть курс — больше не списывать сеансы</label>' : ''}
+    <div class="btn-row">
+      <button class="btn btn-primary cf-save" type="button">${course ? 'Сохранить' : 'Добавить курс'}</button>
+      <button class="btn btn-ghost cf-cancel" type="button">Отмена</button>
+    </div>
+    ${course ? '<button class="cf-delete" type="button">Удалить курс (если завели по ошибке)</button>' : ''}
+    <div class="save-status cf-status"></div>
+  `;
+  const q = (sel) => form.querySelector(sel);
+  q('.cf-service').value = course ? (course.serviceId || '') : '';
+  q('.cf-name').value = course ? course.name : '';
+  q('.cf-sessions').value = course ? course.sessions : 10;
+  q('.cf-used').value = course ? (course.usedBefore || 0) : 0;
+  q('.cf-paid').value = course ? course.paid : '';
+  q('.cf-paid-at').value = course ? course.paidAt : todayKey();
+  q('.cf-note').value = course ? (course.note || '') : '';
+  if (course) q('.cf-closed').checked = !!course.closedAt;
+
+  q('.cf-service').addEventListener('change', () => {
+    const svc = getServiceById(q('.cf-service').value);
+    if (svc && (!q('.cf-name').value.trim() || !course)) q('.cf-name').value = svc.name;
+  });
+  q('.cf-cancel').addEventListener('click', () => form.remove());
+
+  const status = q('.cf-status');
+  const fail = (text) => { status.textContent = text; status.style.color = '#B07E7E'; };
+  q('.cf-save').addEventListener('click', async () => {
+    status.textContent = '';
+    const payload = {
+      id,
+      clientPhone: client.phone,
+      clientName: client.name,
+      serviceId: q('.cf-service').value || null,
+      name: q('.cf-name').value.trim(),
+      sessions: Number(q('.cf-sessions').value),
+      usedBefore: Number(q('.cf-used').value || 0),
+      paid: q('.cf-paid').value.trim() === '' ? NaN : Number(q('.cf-paid').value),
+      paidAt: q('.cf-paid-at').value,
+      note: q('.cf-note').value.trim(),
+      closed: course ? q('.cf-closed').checked : false,
+    };
+    if (!payload.name) return fail('Укажите название курса');
+    if (!Number.isInteger(payload.sessions) || payload.sessions < 1 || payload.sessions > 100) return fail('Сеансов — от 1 до 100');
+    if (!Number.isInteger(payload.usedBefore) || payload.usedBefore < 0 || payload.usedBefore >= payload.sessions) return fail('Использовано должно быть меньше, чем сеансов');
+    if (!Number.isFinite(payload.paid) || payload.paid < 0) return fail('Укажите сумму (0 — если оплата была до учёта)');
+    if (!payload.paidAt) return fail('Укажите дату оплаты');
+    if (!payload.serviceId && !confirm('Курс без привязки к услуге не будет списываться автоматически при записи — только вручную. Сохранить так?')) return;
+
+    const btn = q('.cf-save');
+    btn.disabled = true;
+    btn.textContent = 'Сохраняем...';
+    try{
+      await withTimeout(Store.saveCourse(payload), 10000);
+      renderClientsTab();
+    }catch(e){
+      btn.disabled = false;
+      btn.textContent = course ? 'Сохранить' : 'Добавить курс';
+      const m = String(e && e.message);
+      if (m.includes('invalid-course')) return fail('Проверьте поля. Сеансов не может быть меньше, чем уже использовано и записано.');
+      if (m.includes('unauthorized')) return fail('Сессия истекла — обновите страницу и войдите снова');
+      fail('Не удалось сохранить. Попробуйте снова.');
+    }
+  });
+
+  if (course){
+    q('.cf-delete').addEventListener('click', async () => {
+      if (!confirm(`Удалить курс «${course.name}»? Это для курсов, заведённых по ошибке.`)) return;
+      try{
+        await withTimeout(Store.deleteCourse(course.id), 10000);
+        renderClientsTab();
+      }catch(e){
+        const m = String(e && e.message);
+        if (m.includes('course-in-use')) return fail('По курсу уже есть визиты или записи — его можно только закрыть (галочка выше).');
+        fail('Не удалось удалить. Попробуйте снова.');
+      }
+    });
+  }
+  return form;
 }
 
 function buildClientCard(client){
@@ -1314,16 +1514,6 @@ function buildClientCard(client){
   const noteValue = clientsView.noteDrafts.has(key) ? clientsView.noteDrafts.get(key) : (client.notes || '');
   const toggleLabel = `Все посещения (${visits.length})` + (noShows ? ` · неявок: ${noShows}` : '');
 
-  // Курсы клиента — из той же истории, что и список посещений.
-  const clientCourses = [...buildCourses(visits).values()];
-  const active = clientCourses.filter(c => c.used < c.sessions);
-  const finished = clientCourses.length - active.length;
-  const coursesHtml = clientCourses.length ? `
-    <div class="course-line">
-      ${active.map(c => `🎟 «${escapeHtml(c.name)}» — ${courseLeftLabel(c)}`).join('<br>')}
-      ${finished ? `<div class="course-finished">${active.length ? '' : '🎟 '}Завершённых курсов: ${finished}</div>` : ''}
-    </div>` : '';
-
   const card = document.createElement('div');
   card.className = 'booking-card client-card';
   card.innerHTML = `
@@ -1337,7 +1527,7 @@ function buildClientCard(client){
       <span>Потрачено: <b>${(client.totalSpent||0).toLocaleString('ru-RU')} ₽</b></span>
       <span>Последний: <b>${escapeHtml(client.lastVisit || '—')}</b></span>
     </div>
-    ${coursesHtml}
+    <div class="client-courses"></div>
     <button type="button" class="visits-toggle">
       <span>${toggleLabel}</span>
       <span class="visits-chev${isOpen ? ' open' : ''}">▾</span>
@@ -1349,6 +1539,8 @@ function buildClientCard(client){
       <div class="save-status note-status"></div>
     </div>
   `;
+
+  renderClientCourses(card.querySelector('.client-courses'), client);
 
   // Раскрытие списка посещений. Разметку строим лениво — при первом открытии.
   const toggleBtn = card.querySelector('.visits-toggle');
@@ -1478,38 +1670,47 @@ async function renderAnalyticsTab(){
   container.innerHTML = '<div class="empty-state">Загружаем...</div>';
 
   let history = [];
-  try{ history = await Store.getHistory(); }
+  try{ [history, coursesCache] = await Promise.all([Store.getHistory(), Store.getCourses()]); }
   catch(e){ container.innerHTML = '<div class="empty-state">Ошибка загрузки</div>'; return; }
+  historyCache = history;
 
   const completed = history.filter(h => h.status === 'completed');
   const noshow    = history.filter(h => h.status === 'no_show');
 
   // Деньги и время — по факту визита (visitPaid/visitDuration): со скидками,
-  // курсами и заменой процедуры. Курсы — по кассе: продажа курса идёт в
-  // выручку целиком в день покупки, посещения по нему — 0 ₽ (или доплата).
-  const payTypeOf = h => h.actual ? h.actual.payType : 'single';
+  // курсами и заменой процедуры. Курсы — по кассе: оплата курса идёт в
+  // выручку целиком в месяц оплаты, визиты по нему — 0 ₽ (или доплата).
   const byMonth = {};
+  const monthOf = (key) => byMonth[key] || (byMonth[key] = { visits:0, revenue:0, minutes:0, courseSales:0, courseVisits:0 });
   completed.forEach(h => {
-    const month = h.date.slice(0,7); // YYYY-MM
-    if (!byMonth[month]) byMonth[month] = { visits:0, revenue:0, minutes:0, courseSales:0, courseVisits:0 };
-    const m = byMonth[month];
+    const m = monthOf(h.date.slice(0,7)); // YYYY-MM
     m.visits++;
     m.revenue += visitPaid(h);
     m.minutes += visitDuration(h);
-    if (payTypeOf(h) === 'course_sale') m.courseSales += visitPaid(h);
-    if (payTypeOf(h) === 'course_visit') m.courseVisits++;
+    if (visitCourseId(h)) m.courseVisits++;
+  });
+  coursesCache.forEach(c => {
+    if (!c.paid) return;
+    const m = monthOf(c.paidAt.slice(0,7));
+    m.revenue += c.paid;
+    m.courseSales += c.paid;
   });
 
-  const totalRevenue = completed.reduce((s,h)=>s+visitPaid(h), 0);
+  const courseSalesSum = coursesCache.reduce((s,c)=>s+(c.paid||0), 0);
+  const visitsRevenue = completed.reduce((s,h)=>s+visitPaid(h), 0);
+  const totalRevenue = visitsRevenue + courseSalesSum;
   const totalMinutes = completed.reduce((s,h)=>s+visitDuration(h), 0);
   const uniqueClients = new Set(completed.map(h => phoneTail10(h.clientPhone))).size;
-  const courseSalesSum = completed.filter(h => payTypeOf(h) === 'course_sale').reduce((s,h)=>s+visitPaid(h), 0);
-  const courseVisits = completed.filter(h => payTypeOf(h) === 'course_visit').length;
+  const courseVisits = completed.filter(h => visitCourseId(h)).length;
   const perVisit = completed.length ? Math.round(totalRevenue / completed.length) : 0;
   const noshowRate = history.length ? Math.round(noshow.length / history.length * 100) : 0;
-  // Предоплаченные сеансы — сколько визитов ещё «должны» по проданным курсам.
-  const activeCourses = [...buildCourses(history).values()].filter(c => c.used < c.sessions);
-  const prepaidLeft = activeCourses.reduce((s,c)=>s+(c.sessions - c.used), 0);
+  // Предоплаченные сеансы — сколько визитов ещё «должны» по курсам
+  // (записанные вперёд тоже сюда: они ещё не пришли).
+  const activeCourses = coursesCache.filter(c => !c.closedAt).map(c => {
+    const u = courseUsage(c);
+    return { c, notYet: Math.max(0, u.left + u.booked) };
+  }).filter(x => x.notYet > 0);
+  const prepaidLeft = activeCourses.reduce((s,x)=>s+x.notYet, 0);
 
   const months = Object.keys(byMonth).sort().reverse();
   const MONTH_NAMES = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
@@ -1981,6 +2182,9 @@ async function submitMasterBooking(force){
       serviceDuration: Number($('mfDuration').value),
       servicePrice: Number($('mfPrice').value) || 0,
     });
+    // id услуги из каталога — по нему сервер сам спишет запись с курса
+    // клиентки, как и при записи с сайта.
+    if (svc) booking.serviceItems = [{ id: svc.id, price: booking.servicePrice }];
   }
 
   const notifyClient = !masterForm.reserve && $('mfNotify').checked;
@@ -2020,6 +2224,7 @@ async function submitMasterBooking(force){
     Store.bookings.push({ ...data.booking, clientNotes: '' });
   }
   const parts = [masterForm.reserve ? '✓ Время занято' : '✓ Записано'];
+  if (data.booking.courseId) parts.push(`🎟 по курсу «${data.booking.courseName}»`);
   if (!masterForm.reserve && notifyClient){
     if (data.clientNotified === 'max') parts.push('клиенту отправлено в MAX');
     else if (data.clientNotified === 'telegram') parts.push('клиенту отправлено в Telegram');

@@ -579,6 +579,21 @@
   .vf-hint{ font-size:12.5px; margin:-6px 0 14px; }
   .monthly-sub{ flex-basis:100%; font-size:11.5px; color:var(--bronze); text-align:right; }
 
+  .client-courses{ margin:4px 0 8px; }
+  .course-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:12.5px; font-weight:600; color:var(--bronze); padding:2px 0; }
+  .course-row.inactive{ color:var(--ink-soft); font-weight:400; }
+  .course-edit-btn{ border:none; background:transparent; cursor:pointer; font-size:13px; padding:2px 6px; }
+  .course-add-btn{
+    margin-top:4px; padding:6px 12px; border-radius:9px; border:1.5px dashed var(--line); background:transparent;
+    font-family:'Manrope'; font-weight:700; font-size:12px; color:var(--bronze); cursor:pointer;
+  }
+  .course-add-btn:hover{ color:var(--rose-deep); border-color:var(--rose-deep); }
+  .course-form{ margin:10px 0 4px; }
+  .cf-delete{
+    margin-top:10px; padding:0; border:none; background:none; cursor:pointer;
+    font-family:'Manrope'; font-size:12px; color:var(--ink-soft); text-decoration:underline;
+  }
+
   /* --- Клиенты --- */
   .client-stats{
     display:flex; flex-wrap:wrap; gap:12px;

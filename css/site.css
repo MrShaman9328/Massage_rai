@@ -321,7 +321,9 @@
   .confirm-title{ font-family:'Marcellus', serif; font-size:23px; text-align:center; margin:0 0 8px; }
   .confirm-sub{ text-align:center; font-size:13.5px; color:var(--ink-soft); margin-bottom:24px; line-height:1.6; }
   .confirm-details{ background:var(--bg-soft); border-radius:14px; padding:18px; }
-  .confirm-details .row{ display:flex; justify-content:space-between; padding:7px 0; font-size:13.5px; border-bottom:1px solid var(--line); }
+  .confirm-details .row{ display:flex; justify-content:space-between; gap:14px; padding:7px 0; font-size:13.5px; border-bottom:1px solid var(--line); }
+  .confirm-details .row span:first-child{ flex-shrink:0; color:var(--ink-soft); }
+  .confirm-details .row span:last-child{ text-align:right; }
   .confirm-details .row:last-child{ border-bottom:none; }
 
   .cancel-entry{ text-align:center; margin-bottom:16px; }

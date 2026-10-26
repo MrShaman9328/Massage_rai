@@ -89,7 +89,9 @@ const Store = {
     // остальных полей — возвращаем это клиенту, чтобы показать именно
     // то, что реально сохранено (а не то, что клиент отправил).
     const data = await callApi('createBooking', { booking });
-    return data.booking;
+    // course — если сервер списал запись с курса клиентки: название и
+    // сколько сеансов останется после этого визита.
+    return { booking: data.booking, course: data.course || null };
   },
 
   // Проверка телефона и поиск/отмена/перенос теперь целиком на сервере —
@@ -544,6 +546,8 @@ async function submitBooking(){
       serviceName: services.map(s => s.name).join(', '),
       serviceDuration: totalDuration,
       servicePrice: totalPrice,
+      // По id услуг сервер сверяет запись с курсом клиентки.
+      serviceItems: services.map(s => ({ id: s.id, price: s.price })),
       clientName: name,
       clientPhone: phone,
       comment: comment,
@@ -562,7 +566,7 @@ async function submitBooking(){
     // после паузы в обращениях, первый запрос иногда занимает дольше обычного.
     // Уведомление в Telegram отправляется самой функцией на сервере — отдельного
     // вызова из браузера больше не требуется.
-    const savedBooking = await withTimeout(Store.saveNewBooking(booking), 20000);
+    const { booking: savedBooking, course } = await withTimeout(Store.saveNewBooking(booking), 20000);
     if (!Store.bookedSlots.some(b => b.date === booking.date && b.start === booking.start && b.end === booking.end)){
       Store.bookedSlots.push({ date: booking.date, start: booking.start, end: booking.end });
     }
@@ -570,7 +574,7 @@ async function submitBooking(){
     // savedBooking — это то, что реально записано на сервере (сервер сам
     // проставляет cancelCode/createdAt). На случай сбоя ответа подстрахуемся
     // локальным объектом, чтобы экран подтверждения не сломался совсем.
-    showConfirmation(savedBooking || booking);
+    showConfirmation(savedBooking || booking, course);
   }catch(e){
     console.error('Booking submission error:', e);
 
@@ -618,9 +622,15 @@ async function submitBooking(){
   }
 }
 
-function showConfirmation(booking){
+function showConfirmation(booking, course){
   const dateObj = new Date(booking.date + 'T00:00:00');
   const dateStr = dateObj.toLocaleDateString('ru-RU', { day:'numeric', month:'long', weekday:'long' });
+
+  // Курс показываем только здесь, после записи: до отправки сайт по номеру
+  // телефона ничего о клиентке не сообщает.
+  const courseRows = course ? `
+    <div class="row"><span>Курс</span><span>«${escapeHtml(course.name)}» — после визита останется ${course.leftAfter} из ${course.sessions}</span></div>
+    <div class="row"><span>К оплате</span><span>${booking.servicePrice ? `${booking.servicePrice.toLocaleString('ru-RU')} ₽` : 'оплачено курсом'}</span></div>` : '';
 
   document.getElementById('confirmDetails').innerHTML = `
     <div class="row"><span>Услуга</span><span>${escapeHtml(booking.serviceName)}</span></div>
@@ -628,6 +638,7 @@ function showConfirmation(booking){
     <div class="row"><span>Время</span><span>${escapeHtml(booking.start)}–${escapeHtml(booking.end)}</span></div>
     <div class="row"><span>Имя</span><span>${escapeHtml(booking.clientName)}</span></div>
     <div class="row"><span>Телефон</span><span>${escapeHtml(booking.clientPhone)}</span></div>
+    ${courseRows}
   `;
   document.getElementById('telegramReminderBtn').href = `https://t.me/rai_massage_bot?start=${booking.id}`;
   // Ник бота MAX задаётся платформой и не меняется. Сверить с выводом
