@@ -40,10 +40,11 @@
     <div class="amb amb-evening"></div>
     ${Object.values(AROMAS).map(a => `<div class="amb amb-aroma amb-${a}" data-aroma="${a}"></div>`).join('')}
     <svg class="flow">
-      <path class="flow-thin" pathLength="1"/>
-      <path class="flow-main" pathLength="1"/>
+      <path class="flow-thin"/>
+      <path class="flow-main"/>
     </svg>
     <div class="flow-spark"></div>
+    <div class="flow-spark flow-spark-thin"></div>
     <div class="petals"></div>
   `;
   document.body.prepend(amb);
@@ -53,6 +54,7 @@
   const mainPath = amb.querySelector('.flow-main');
   const thinPath = amb.querySelector('.flow-thin');
   const spark = amb.querySelector('.flow-spark');
+  const sparkThin = amb.querySelector('.flow-spark-thin');
 
   // Линия идёт волной в боковых полях — справа основная с огоньком, слева
   // тонкая. За панелями её не видно, а поля свободны всегда: на телефоне
@@ -61,7 +63,7 @@
   // линия стала бы разной толщины, а non-scaling-stroke ломает пунктир,
   // на котором держится «рисование».
   const WRAP_MAX = 560, WRAP_PAD = 20;
-  let mainLen = 0;
+  let mainLen = 0, thinLen = 0;
   function wave(xA, xB, waves){
     const top = -20, step = (innerHeight + 40) / waves;
     let d = `M${xA.toFixed(1)} ${top}`;
@@ -84,7 +86,13 @@
     flowSvg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
     mainPath.setAttribute('d', wave(innerWidth - hi, innerWidth - lo, waves));
     thinPath.setAttribute('d', wave(lo, hi, waves + 1));
+    // Пунктир — в настоящей длине пути, той же, по которой ставится огонёк.
+    // С pathLength браузер пересчитывает длину с погрешностью, и на длинной
+    // линии огонёк уезжал от кончика на несколько пикселей.
     mainLen = mainPath.getTotalLength();
+    thinLen = thinPath.getTotalLength();
+    mainPath.style.strokeDasharray = mainLen.toFixed(1);
+    thinPath.style.strokeDasharray = thinLen.toFixed(1);
   }
   layoutFlow();
 
@@ -102,17 +110,23 @@
     if (!rafId) rafId = requestAnimationFrame(frame);
   }
 
+  function drawLine(path, len, p, sparkEl){
+    path.style.strokeDashoffset = (len * (1 - p)).toFixed(1);
+    const pt = path.getPointAtLength(len * p);
+    sparkEl.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0)`;
+    sparkEl.style.opacity = p > 0.01 && p < 0.995 ? '1' : '0';
+  }
+
   function frame(){
     rafId = 0;
     const d = target - current;
     current = reduced || Math.abs(d) < 0.0005 ? target : current + d * 0.12;
 
     evening.style.opacity = ease(current).toFixed(3);
-    mainPath.style.strokeDashoffset = (1 - current).toFixed(4);
-    thinPath.style.strokeDashoffset = (1 - clamp(current * 1.15 - 0.08)).toFixed(4);
-    const pt = mainPath.getPointAtLength(current * mainLen);
-    spark.style.transform = `translate3d(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px, 0)`;
-    spark.style.opacity = current > 0.01 && current < 0.995 ? '1' : '0';
+    drawLine(mainPath, mainLen, current, spark);
+    // Левая линия чуть обгоняет правую — так они не движутся зеркально.
+    drawLine(thinPath, thinLen, clamp(current * 1.15 - 0.08), sparkThin);
+    flowSvg.classList.add('ready');
     if (current !== target) rafId = requestAnimationFrame(frame);
   }
 
