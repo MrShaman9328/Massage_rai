@@ -64,8 +64,8 @@
   // на котором держится «рисование».
   const WRAP_MAX = 560, WRAP_PAD = 20;
   let mainLen = 0, thinLen = 0;
-  function wave(xA, xB, waves){
-    const top = -20, step = (innerHeight + 40) / waves;
+  function wave(xA, xB, waves, height){
+    const top = -20, step = (height + 40) / waves;
     let d = `M${xA.toFixed(1)} ${top}`;
     for (let i = 1; i <= waves; i++){
       const y = top + step * i;
@@ -78,14 +78,18 @@
     return d;
   }
   function layoutFlow(){
-    const margin = Math.max(0, (innerWidth - WRAP_MAX) / 2) + WRAP_PAD;
+    // Размер — самого слоя, а не окна: innerWidth включает полосу прокрутки
+    // (на Windows ~17px), слоя под ней нет. Браузер ужимал рисунок под слой,
+    // и у правого края огонёк уезжал от линии на ширину этой полосы.
+    const W = amb.clientWidth, H = amb.clientHeight;
+    const margin = Math.max(0, (W - WRAP_MAX) / 2) + WRAP_PAD;
     // Размах волны: в узком поле — почти всё поле, в широком — до 160px по центру.
     const swing = Math.min(margin * 0.6, 160);
     const lo = (margin - swing) / 2, hi = lo + swing;
-    const waves = innerWidth < 600 ? 5 : 4;
-    flowSvg.setAttribute('viewBox', `0 0 ${innerWidth} ${innerHeight}`);
-    mainPath.setAttribute('d', wave(innerWidth - hi, innerWidth - lo, waves));
-    thinPath.setAttribute('d', wave(lo, hi, waves + 1));
+    const waves = W < 600 ? 5 : 4;
+    flowSvg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    mainPath.setAttribute('d', wave(W - hi, W - lo, waves, H));
+    thinPath.setAttribute('d', wave(lo, hi, waves + 1, H));
     // Пунктир — в настоящей длине пути, той же, по которой ставится огонёк.
     // С pathLength браузер пересчитывает длину с погрешностью, и на длинной
     // линии огонёк уезжал от кончика на несколько пикселей.
