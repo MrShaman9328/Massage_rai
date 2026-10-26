@@ -1,0 +1,131 @@
+/* Оформление страницы записи: живой фон по прокрутке, линия-свуш, «ароматы» SPA.
+   Слои создаёт js/effects.js и вешает на <html> класс .fx — без JS
+   страница выглядит как раньше. Анимируются только opacity и transform:
+   это не нагружает слабые телефоны (никаких blur и пересчёта вёрстки). */
+
+.ambient{ position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden; }
+.amb{ position:absolute; inset:0; opacity:0; will-change:opacity; }
+
+/* Вечер: чем ниже по странице, тем теплее — как свечи на афишах салона */
+.amb-evening{
+  background:
+    radial-gradient(ellipse 90% 55% at 50% 112%, rgba(214,160,92,0.34), transparent 70%),
+    radial-gradient(ellipse 70% 50% at 100% 45%, rgba(156,96,86,0.16), transparent 70%),
+    linear-gradient(180deg, rgba(120,80,70,0) 0%, rgba(120,80,70,0.10) 100%);
+}
+
+/* Ароматы SPA-программ — по слою на каждую, смена плавным перетеканием */
+.amb-aroma{ transition:opacity 1.2s ease; }
+.amb-aroma.on{ opacity:1; }
+.amb-lavender{ background:radial-gradient(ellipse 90% 70% at 12% 45%, rgba(155,140,196,0.32), transparent 70%), radial-gradient(ellipse 80% 60% at 92% 85%, rgba(201,154,154,0.20), transparent 70%); }
+.amb-lime{     background:radial-gradient(ellipse 90% 70% at 12% 45%, rgba(150,190,120,0.28), transparent 70%), radial-gradient(ellipse 80% 60% at 92% 85%, rgba(240,228,200,0.55), transparent 70%); }
+.amb-citrus{   background:radial-gradient(ellipse 90% 70% at 12% 45%, rgba(240,196,92,0.32), transparent 70%), radial-gradient(ellipse 80% 60% at 92% 85%, rgba(232,150,90,0.18), transparent 70%); }
+.amb-wine{     background:radial-gradient(ellipse 90% 70% at 12% 45%, rgba(142,59,82,0.24), transparent 70%), radial-gradient(ellipse 80% 60% at 92% 85%, rgba(196,120,140,0.20), transparent 70%); }
+.amb-sea{      background:radial-gradient(ellipse 90% 70% at 12% 45%, rgba(94,140,106,0.26), transparent 70%), radial-gradient(ellipse 80% 60% at 92% 85%, rgba(120,170,160,0.20), transparent 70%); }
+
+/* Линия-свуш: рисуется по мере прокрутки, на кончике — огонёк */
+.flow{ position:absolute; inset:0; width:100%; height:100%; }
+/* Длину пунктира выставляет effects.js по настоящей длине пути; до этого линия скрыта */
+.flow path{ fill:none; stroke-linecap:round; }
+.flow:not(.ready){ visibility:hidden; }
+.flow-main{ stroke:rgba(176,126,126,0.55); stroke-width:1.6; }
+.flow-thin{ stroke:rgba(156,130,102,0.35); stroke-width:1; }
+.flow-spark{
+  position:absolute; left:0; top:0; width:14px; height:14px; margin:-7px 0 0 -7px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,236,200,1) 0%, rgba(232,180,110,0.75) 35%, rgba(232,180,110,0) 70%);
+  opacity:0; will-change:transform, opacity;
+}
+
+/* Огонёк левой, тонкой линии — меньше и тише */
+.flow-spark-thin{ width:10px; height:10px; margin:-5px 0 0 -5px; filter:saturate(.7); }
+.flow-spark-thin{ background:radial-gradient(circle, rgba(255,240,215,0.95) 0%, rgba(200,170,130,0.6) 38%, rgba(200,170,130,0) 70%); }
+
+/* Плывущие веточки и дольки — цвет берут из аромата */
+.petals{ position:absolute; inset:0; }
+/* Подъём рисунков задаёт effects.js через element.animate() готовыми
+   числами. CSS-переменные внутри @keyframes Яндекс Браузер на Android не
+   анимирует: рисунок сразу вставал в конечную точку и стоял на месте. */
+.petal{ position:absolute; bottom:-60px; opacity:0; will-change:transform, opacity; }
+.petal svg{ width:100%; height:100%; animation:petal-sway 6s ease-in-out infinite alternate; }
+.petals.fade .petal{ opacity:0 !important; }
+@keyframes petal-sway{ from{ transform:translateX(-14px); } to{ transform:translateX(14px); } }
+
+/* Вспорх по нажатию на программу: рисунки поднимаются из карточки поверх
+   страницы и тают. Фоновые рисунки на телефоне почти скрыты карточками —
+   этот отклик видно на любом экране. Нажатиям не мешает (pointer-events). */
+.aroma-burst{ position:fixed; inset:0; z-index:30; pointer-events:none; overflow:hidden; }
+.burst-sprig{ position:absolute; opacity:0; will-change:transform, opacity; }
+.burst-sprig svg{ width:100%; height:100%; animation:petal-sway 1.3s ease-in-out infinite alternate; }
+
+/* На телефоне панель услуг закрывает весь экран, и фон за ней не виден.
+   Поэтому аромат проявляется и внутри панели: она чуть окрашивается,
+   лепестки плывут в просветах между карточками, а у активной программы
+   в углу проступает её рисунок. */
+.fx #step1{ transition:background-color .9s ease; }
+/* После появления панели transform с неё снимаем: иначе position:fixed у
+   лепестков считался бы от панели, а не от экрана. */
+.fx #step1{ animation-fill-mode:backwards; }
+.fx #step1 > .petals{ position:fixed; inset:0; z-index:-1; pointer-events:none; overflow:hidden; }
+html[data-aroma="lavender"] #step1{ background-color:#F6F2FB; }
+html[data-aroma="lime"]     #step1{ background-color:#F3F7EE; }
+html[data-aroma="citrus"]   #step1{ background-color:#FDF7EA; }
+html[data-aroma="wine"]     #step1{ background-color:#FAEFF2; }
+html[data-aroma="sea"]      #step1{ background-color:#EEF5F1; }
+
+.fx .service{ position:relative; transition:border-color .4s, background .4s, box-shadow .6s; }
+.fx .service-row, .fx .spa-toggle, .fx .spa-details{ position:relative; z-index:1; }
+/* Содержимое карточек выше поднято на слой 1 (над рисунком аромата) —
+   липкая плашка «Продолжить» должна оставаться над ними. */
+.fx .services-footer{ z-index:2; }
+.fx .service.aroma-on{ border-color:var(--aroma-ink); box-shadow:0 10px 28px -14px var(--aroma-ink), inset 0 0 0 1px var(--aroma-ink); }
+.fx .service.aroma-on .service-name{ color:var(--aroma-ink); }
+.fx .service.aroma-on .spa-toggle{ color:var(--aroma-ink); }
+.aroma-mark{
+  position:absolute; right:-10px; bottom:-14px; width:92px; height:92px; color:var(--aroma-ink);
+  opacity:0; transform:rotate(-14deg) scale(.8); pointer-events:none;
+  transition:opacity .8s ease, transform 1.4s cubic-bezier(.2,.8,.2,1);
+}
+.aroma-mark svg{ width:100%; height:100%; }
+.service.aroma-on .aroma-mark{ opacity:.2; transform:rotate(0) scale(1); }
+
+/* Шапка: фото уходит медленнее страницы, герб чуть отстаёт — глубина */
+.fx header::before{ transform:translate3d(0, calc(var(--hero-shift, 0) * 0.35px), 0); will-change:transform; }
+.fx .crest{ transform:translate3d(0, calc(var(--hero-shift, 0) * 0.15px), 0); opacity:calc(1 - var(--hero-shift, 0) / 520); }
+.fx .swoosh path{ stroke-dasharray:140; stroke-dashoffset:140; animation:swoosh-draw 1.6s ease .3s forwards; }
+@keyframes swoosh-draw{ to{ stroke-dashoffset:0; } }
+
+/* Плашка о ценах: мягкий блик пробегает раз в несколько секунд */
+.fx .price-notice{ position:relative; overflow:hidden; }
+.fx .price-notice::after{
+  content:""; position:absolute; top:0; bottom:0; left:-60%; width:50%;
+  background:linear-gradient(100deg, transparent, rgba(255,255,255,0.55), transparent);
+  transform:skewX(-18deg); animation:notice-shine 6s ease-in-out 1.5s infinite;
+}
+@keyframes notice-shine{ 0%{ left:-60%; } 30%,100%{ left:130%; } }
+
+/* Появление отзывов и блока «о салоне» при прокрутке */
+.fx .reveal{ opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1); }
+.fx .reveal.in{ opacity:1; transform:none; }
+
+/* На телефоне линия живёт в полосе 20px у края — делаем её заметнее */
+@media (max-width: 600px){
+  .flow-main{ stroke:rgba(176,126,126,0.75); stroke-width:2; }
+  .flow-thin{ stroke:rgba(156,130,102,0.5); stroke-width:1.4; }
+  .flow-spark{ width:18px; height:18px; margin:-9px 0 0 -9px; }
+  .flow-spark-thin{ width:12px; height:12px; margin:-6px 0 0 -6px; }
+}
+
+/* Статичный вариант — при «уменьшить движение» в системе (решает effects.js):
+   убираем блик и параллакс шапки. Плывущие веточки и дольки оставлены всем
+   намеренно: эту настройку сообщают и Windows с выключенными эффектами, и
+   Android в энергосбережении — без них аромат не увидела бы заметная часть
+   клиенток. Плывут они медленно и только после нажатия на программу. */
+.fx-still .swoosh path{ animation:none; stroke-dashoffset:0; }
+.fx-still .price-notice::after{ display:none; }
+.fx-still header::before, .fx-still .crest{ transform:none; opacity:1; }
+.fx-still .reveal{ opacity:1; transform:none; transition:none; }
+
+.fx-debug{
+  position:fixed; left:8px; right:8px; bottom:8px; z-index:50; padding:8px 10px; border-radius:10px;
+  background:rgba(58,44,41,0.88); color:#fff; font:11px/1.4 'Manrope', sans-serif; word-break:break-word;
+}
